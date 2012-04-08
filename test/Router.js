@@ -2,9 +2,9 @@ var express = require('express');
 var should = require('should');
 var hottap = require('hottap').hottap;
 var _ = require('underscore');
-// TODO kill this require?
 
 var Router = require('../lib/Router').Router;
+
 
 describe('Router', function(){
 	beforeEach(function(){
@@ -82,61 +82,7 @@ describe('Router', function(){
       });
     });
 
-    it ("responds with a 405 if the resource exists but the method is disallowed", function(done){
-      this.app.listen(1338, function(){
-        hottap("http://localhost:1338/happy").request("POST", function(err, result){
-          result.status.should.equal(405)
-          JSON.parse(result.body).error.type.should.equal("MethodNotAllowed")
-          JSON.parse(result.body).error.message.should.equal("That method is not allowed for this resource.")
-          JSON.parse(result.body).error.detail.should.equal('POST')
-          done();
-        });
-      });
-    });
-
-    it ("responds with the Allow header for a simple OPTIONS", function(done){
-      this.app.listen(9999, function(){
-        hottap("http://localhost:9999/happy").request("OPTIONS", function(err, result){
-          if (!!err){ console.log(err); should.fail("error shouldn't exist. " + err);}
-          result.status.should.equal(200)
-          should.exist(result.headers['allow'])
-          result.headers['allow'].should.equal("GET")
-          JSON.parse(result.body)['Allowed'][0].should.equal("GET")
-          JSON.parse(result.body)['Allowed'].length.should.equal(1)
-          done();
-        });
-      });
-    });
-
-    it ("responds with the Allow header for a OPTIONS on sub-resources of collections", function(done){
-      this.app.listen(9999, function(){
-        hottap("http://localhost:9999/many/1234").request("OPTIONS", function(err, result){
-          if (!!err){ console.log(err); should.fail("error shouldn't exist. " + err);}
-          result.status.should.equal(200)
-          should.exist(result.headers['allow'])
-          result.headers['allow'].should.equal("GET")
-          JSON.parse(result.body)['Allowed'][0].should.equal("GET")
-          JSON.parse(result.body)['Allowed'].length.should.equal(1)
-          done();
-        });
-      });
-    });
-
-    it ("responds with the Allow header for a OPTIONS on collections", function(done){
-      this.app.listen(9999, function(){
-        hottap("http://localhost:9999/many/").request("OPTIONS", function(err, result){
-          if (!!err){ console.log(err); should.fail("error shouldn't exist. " + err);}
-          result.status.should.equal(200)
-          should.exist(result.headers['allow'])
-          result.headers['allow'].should.equal("GET")
-          JSON.parse(result.body)['Allowed'][0].should.equal("GET")
-          JSON.parse(result.body)['Allowed'].length.should.equal(1)
-          done();
-        });
-      });
-    });
-
-    it ("responds with a service document when the root is requested", function(done){
+    it ("responds with a root resource when one exists", function(done){
       this.app.listen(9999, function(){
         hottap("http://localhost:9999/").request("GET", function(err, result){
           result.status.should.equal(200)

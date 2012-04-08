@@ -17,13 +17,13 @@
         } 
       ],
       "dependencies": {
-          "express" : "2.5.8",
+          "express" : "2.5.9",
           "express-resource" : "0.2.3",
           "underscore" : ""
       },
       "devDependencies" : {
           "hottap" : "1.0.0",
           "mocha" : "0.14.1",
-          "should" : "0.3.2"
+          "should" : "0.6.0"
       }
 }
