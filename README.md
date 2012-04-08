@@ -1,8 +1,7 @@
 # detour
-[![Build
-Status](https://secure.travis-ci.org/cainus/detour?branch=master)](http://travis-ci.org/cainus/detour)
+[![Build Status](https://secure.travis-ci.org/cainus/detour.png?branch=master)](http://travis-ci.org/cainus/detour)
 
-detour is a re-imagining of express.js routing.
+Totally experimental and useless!
 
 ## Automated Tests:
 npm test
