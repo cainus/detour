@@ -4,23 +4,37 @@ var hottap = require('hottap').hottap;
 var _ = require('underscore');
 /*
 
-- make detour very easily readable by percolator or resources
-- make detour very easy to add routes manually without files and file
-walking.  files and file walking should just be one way to do it.
-x take all error handling out of the detour.  just let detour route.
-x percolator is responsible for adding HEAD / OPTIONS to routes that it
-finds, including 405 routes
-x percolator auto-generates the service document - service document is removed
+CONSTRAINTS:
+* routes shouldn't really have anything to do with methods
+* we want collections and their members in the same file, so they 
+can share code easily.
+* collections can be auto-detected by the existance of collection methods
+* routes should be easily readable/writable by framework and resources
+* make fs-based routing awesome but not required
+* ? framework or router should add HEAD/OPTIONS/405 routes
+* make this a new connect-compatible routing middleware to replace express' 
+router
+* ? how will restful file api add directories on the fly? (existance of dir
+in static files can signal to the router that there's a route.  
+programmatic routes then?)
+* ? how to handle sub resources of regular resources?
+* ? how to handle sub resources of member resources (sub dir matching 
+collection name)?
+* ? how to do route-specific middleware like authorization?
+
+
+TODOS:
+- do the routing work instead of relying on express
 x getRoute(url) returns the route node for that url
 x getURL(routenode) returns the url for a given routenode
 - getChildUrls(node) returns the urls of the kids of a given node
 - resources can read detour routes to add their own links
 x detour should have a method for applying routes, so that they're not
 applied until the method is called.
-- rethink collections, child resources.  is there a better way to regexxy routes?
 x nodes will need a reference to their parent
 - support collections
 - support sub resources of collections
+- support adding routes on-the-fly
 
 // NOTE: express 3.0 seems to be necessary for HEAD method support
 
@@ -51,6 +65,69 @@ describe('detour', function(){
 				should.exist(d.rootResource);
 		 }
   );
+
+	describe('#getRoutes', function(){
+    it ("should be an empty list when there's an empty resource tree and a mount path",
+      function(){
+        var d = new detour('api')
+        d.getRoutes().length.should.equal(0);
+      }
+    )
+    it ("should be an empty list when there's an empty resource tree and no mount path",
+      function(){
+			  var d = new detour('')
+        d.getRoutes().length.should.equal(0);
+      }
+    )
+    it ("has a simple route when one exists in the resource tree", function(){
+			var d = new detour('api')
+			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+      var routes = d.getRoutes()
+      routes.length.should.equal(1);
+      routes[0].url.should.equal("/api")
+    })
+    it ("has two routes for a simple parent/child relationship", function(){
+			var d = new detour('api')
+			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			d.rootResource.addChild('other', 
+															{GET : function(req, res){res.send("OK 2 !")}});
+      var routes = d.getRoutes()
+      routes.length.should.equal(2);
+      routes[0].url.should.equal("/api")
+      routes[1].url.should.equal("/api/other")
+    })
+    it ("can route collections", function(){
+			var d = new detour('api')
+			d.rootResource.module = {collectionGET : function(req, res){res.send("OK!")}}
+      var routes = d.getRoutes()
+      routes.length.should.equal(1);
+      routes[0].url.should.equal("/api")
+    })
+    it ("can route root collection members", function(){
+			var d = new detour('api')
+			d.rootResource.module = { collectionGET : function(req, res){res.send("OK!")},
+                                GET : function(req, res){res.send("member OK!")}
+      }
+      var routes = d.getRoutes()
+      routes.length.should.equal(2);
+      routes[0].url.should.equal("/api")
+      routes[1].url.should.equal("/api/:_id")
+    })
+    it ("can route sub-root collection members", function(){
+			var d = new detour('api')
+			d.rootResource.module = { GET : function(req, res){res.send("root");} }
+			d.rootResource.addChild('other', 
+        { collectionGET : function(req, res){res.send("OK!")},
+          GET : function(req, res){res.send("member OK!")}
+        }
+      );
+      var routes = d.getRoutes()
+      routes.length.should.equal(3);
+      routes[0].url.should.equal("/api")
+      routes[1].url.should.equal("/api/other")
+      routes[2].url.should.equal("/api/other/:other_id")
+    })
+  });
 
 	describe('#setRoutes', function(){
 		it ("doesn't set anything with the default resource tree", function(){

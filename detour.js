@@ -7,6 +7,36 @@ function detour(mountPath){
   this.rootResource = new ResourceTree('/', {})	
 }
 
+detour.prototype.getRoutes = function(app){
+  var routes = []
+	var standardMethods = [ "GET", "POST", "DELETE", "PUT"]
+  var implementsMethods = function(module, methods){
+    return _.intersection(_.keys(module), methods).length > 0;
+  }
+  var isCollection = function(module){
+    return implementsMethods(module, ['collectionGET',
+                                      'collectionPOST',
+                                      'collectionPUT',
+                                      'collectionDELETE'])
+  }
+	var getNodeRoutes = function(parentPath, node){
+		var path = urlJoin(parentPath, node.path) 
+    if (isCollection(node.module)){
+        routes.push({ url : path, resource : node})
+        var id_name = ':' + node.path.replace(/\//, '') + '_id'
+        path = urlJoin(path, id_name)
+    }
+    if (implementsMethods(node.module, standardMethods)){
+      routes.push({ url : path, resource : node})
+      _.each(node.children, function(node){
+        getNodeRoutes(path, node);
+      })
+    }
+  }
+  getNodeRoutes(this.mountPath, this.rootResource)
+  return routes;
+}
+
 detour.prototype.setRoutes = function(app){
 	var setNodeRoutes = function(parentPath, node){
 		var path = urlJoin(parentPath, node.path) 
