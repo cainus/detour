@@ -11,7 +11,9 @@ detour.prototype.getRoutes = function(app){
   var routes = []
 	var standardMethods = [ "GET", "POST", "DELETE", "PUT"]
   var implementsMethods = function(module, methods){
-    return _.intersection(_.keys(module), methods).length > 0;
+    return _.any(methods, function(method){
+                            return !!module[method]
+                          });
   }
   var isCollection = function(module){
     return implementsMethods(module, ['collectionGET',

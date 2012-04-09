@@ -21,7 +21,8 @@ programmatic routes then?)
 * ? how to handle sub resources of member resources (sub dir matching 
 collection name)?
 * ? how to do route-specific middleware like authorization?
-
+* despite this being middleware, 404's won't fall through.  this is the 
+end-of-the-line for bad routes.
 
 TODOS:
 - do the routing work instead of relying on express
@@ -35,6 +36,9 @@ x nodes will need a reference to their parent
 - support collections
 - support sub resources of collections
 - support adding routes on-the-fly
+- get rid of setRoutes?
+- addHandler(404, accept-type, cb) for 404, 405, 414 (request uri is too long) 
+- have defaults for 404, 405, 414
 
 // NOTE: express 3.0 seems to be necessary for HEAD method support
 
