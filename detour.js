@@ -60,6 +60,12 @@ detour.prototype.setRoutes = function(app){
   setNodeRoutes(this.mountPath, this.rootResource)
 }
 
+
+detour.prototype.dispatch = function(req, res, next){
+  var resource = this.getRoute('/')
+  resource.module.GET(req, res)
+}
+
 detour.prototype.getUrl = function(node){
   var getAncestry = function(node){
     if (!node.parentNode){

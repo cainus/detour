@@ -279,6 +279,18 @@ describe('detour', function(){
 
 
   });
+  
+  describe('#dispatch', function(){
+    it ("finds and runs a GET handler at the root path", function(){
+			var d = new detour('')
+      var response = "";
+			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+      var res = {send : function(str){ response = str;}}
+      var req = {}
+      d.dispatch(req, res) 
+      response.should.equal("OK!")
+    });
+  });
 
 	describe('#getParentUrl', function(){
     it ("throws an exception when getting the parent url of a root node", function(){
