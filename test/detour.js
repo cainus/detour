@@ -11,34 +11,42 @@ can share code easily.
 * collections can be auto-detected by the existance of collection methods
 * routes should be easily readable/writable by framework and resources
 * make fs-based routing awesome but not required
-* ? framework or router should add HEAD/OPTIONS/405 routes
+* router should add HEAD/OPTIONS/405 routes. may be overridden externally
 * make this a new connect-compatible routing middleware to replace express' 
 router
 * ? how will restful file api add directories on the fly? (existance of dir
 in static files can signal to the router that there's a route.  
 programmatic routes then?)
-* ? how to handle sub resources of regular resources?
 * ? how to handle sub resources of member resources (sub dir matching 
 collection name)?
+* ? how to handle sub resources of regular resources in the fs? (same as above?)
 * ? how to do route-specific middleware like authorization?
 * despite this being middleware, 404's won't fall through.  this is the 
-end-of-the-line for bad routes.
+end-of-the-line for bad routes.  this can be remedied later if it's a problem.
 
 TODOS:
-- do the routing work instead of relying on express
+- support sub resources of collections
+- support OPTIONS
+- test with real app!
+- does it work on plain express?
+- does it work on plain connect?
+- does it work with filesystem tree?
+- save getRoutes() for dispatch()s repeated use
+- get rid of setRoutes?
+- preliminary documentation
+- getChildUrls(node) returns the urls of the kids of a given node
+- support adding routes on-the-fly
+- custom handlers for 404, 405, 414 (request uri is too long) 
+- what about the HEAD method?
+- programmatic routes?
+- ?? how to do route-specific middleware like authorization?
 x getRoute(url) returns the route node for that url
 x getURL(routenode) returns the url for a given routenode
-- getChildUrls(node) returns the urls of the kids of a given node
-- resources can read detour routes to add their own links
 x detour should have a method for applying routes, so that they're not
 applied until the method is called.
 x nodes will need a reference to their parent
-- support collections
-- support sub resources of collections
-- support adding routes on-the-fly
-- get rid of setRoutes?
-- addHandler(404, accept-type, cb) for 404, 405, 414 (request uri is too long) 
-- have defaults for 404, 405, 414
+x support collections
+x have defaults for 404, 405, 414
 
 // NOTE: express 3.0 seems to be necessary for HEAD method support
 
@@ -266,9 +274,8 @@ describe('detour', function(){
       node.parentNode.path.should.equal('/')
       node.path.should.equal('other')
     });
-    it ("throws an exception if the route doesn't exist", function(){
+    it ("throws an exception if no routes exist", function(){
 			var d = new detour('api')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
       try {
         var node = d.getRoute('/api/other')
         should.fail("an expected exception was not thrown!")
@@ -276,19 +283,138 @@ describe('detour', function(){
         ex.should.equal("That route does not exist: /api/other.")
       }
     })
-
-
+    it ("throws an exception if no route exists", function(){
+			var d = new detour('')
+      try {
+        var node = d.getRoute('/doesNotExist')
+        should.fail("an expected exception was not thrown!")
+      } catch(ex){
+        ex.should.equal("That route does not exist: /doesNotExist.")
+      }
+    })
   });
-  
+
+  describe('#matchRoute', function(){
+    it ("takes a root path and returns that node", function(){
+			var d = new detour('api')
+			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+      var route = d.matchRoute('/api/')
+      route.url.should.equal('/api')
+    });
+    it ("takes a simple child path and returns that node", function(){
+			var d = new detour('api')
+			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			d.rootResource.addChild('other', 
+															{GET : function(req, res){res.send("OK 2 !")}});
+      var route = d.matchRoute('/api/other/')
+      route.url.should.equal('/api/other')
+    });
+    it ("takes a collection member path and returns that node", function(){
+			var d = new detour('api')
+			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			d.rootResource.addChild('other', 
+															{GET : function(req, res){
+                                        res.send("OK 2 !")
+                                     },
+                               collectionGET : function(req, res){
+                                                  res.send("coll GET!")
+                                               }
+                              });
+      var route = d.matchRoute('/api/other/4lph4num3r1c')
+      route.url.should.equal('/api/other/:other_id')
+    });
+    it ("throws an exception if no match is found", function(){
+			var d = new detour('api')
+      try {
+        var route = d.matchRoute('/api/')
+        should.fail("expected exception was not thrown!")
+      } catch (ex) {
+        ex.should.equal("No matching route found.")
+      }
+    });
+  });
+
+
   describe('#dispatch', function(){
+    
     it ("finds and runs a GET handler at the root path", function(){
 			var d = new detour('')
       var response = "";
 			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
       var res = {send : function(str){ response = str;}}
-      var req = {}
+      var req = { method : "GET", url : 'http://localhost:9999/'}
       d.dispatch(req, res) 
       response.should.equal("OK!")
+    });
+    it ("finds and runs a POST handler at the root path", function(){
+			var d = new detour('')
+      var response = "";
+			d.rootResource.module = {POST : function(req, res){res.send("OK!")}}
+      var res = {send : function(str){ response = str;}}
+      var req = { method : "POST", url : 'http://localhost:9999/'}
+      d.dispatch(req, res) 
+      response.should.equal("OK!")
+    });
+    it ("finds and runs a GET handler at a sub path", function(){
+			var d = new detour('')
+      var response = "";
+			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			d.rootResource.addChild('other', 
+															{GET : function(req, res){res.send("OK 2 !")}});
+      var res = {send : function(str){ response = str;}}
+      var req = { method : "GET", url : 'http://localhost:9999/other'}
+      d.dispatch(req, res) 
+      response.should.equal("OK 2 !")
+
+    });
+    it ("404s when it's passed a bad path", function(){
+			var d = new detour('')
+      var response = "NOT OK";
+      var status = 200
+      var req = { method : "GET", url : 'http://localhost:9999/doesNotExist'}
+      var res = {send : function(code, body){ response = body; status = code;}}
+      d.dispatch(req, res)
+      should.not.exist(response)
+      status.should.equal(404)
+    });
+    it ("405s when the method doesn't exist", function(){
+			var d = new detour('')
+      var response = "NOT OK";
+      var status = 200
+			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+      var req = { method : "PUT", url : 'http://localhost:9999/'}
+      var res = {send : function(code, body){ response = body; status = code;}}
+      d.dispatch(req, res)
+      should.not.exist(response)
+      status.should.equal(405)
+    });
+    it('414s when uri is too long', function(){
+      var url = 'http://localhost:9999/';
+      for(var i = 0; i < 500; i++){
+        url += '1234567890';
+      }
+			var d = new detour('')
+      var response = "NOT OK";
+      var status = 200
+			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+      var req = { method : "GET", url : url}
+      var res = {send : function(code, body){ response = body; status = code;}}
+      d.dispatch(req, res)
+      should.not.exist(response)
+      status.should.equal(414)
+    });
+    it ("finds and runs a GET handler on a member of a collection", function(){
+			var d = new detour('')
+      var response = "";
+			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			d.rootResource.addChild('other', 
+															{GET : function(req, res){res.send("OK 2 !")},
+                               collectionGET : function(req, res){res.send("collection OK!")}}
+                             );
+      var res = {send : function(str){ response = str;}}
+      var req = { method : "GET", url : 'http://localhost:9999/other/1234'}
+      d.dispatch(req, res) 
+      response.should.equal('OK 2 !')
     });
   });
 

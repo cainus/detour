@@ -7,28 +7,32 @@ function detour(mountPath){
   this.rootResource = new ResourceTree('/', {})	
 }
 
-detour.prototype.getRoutes = function(app){
-  var routes = []
-	var standardMethods = [ "GET", "POST", "DELETE", "PUT"]
-  var implementsMethods = function(module, methods){
-    return _.any(methods, function(method){
-                            return !!module[method]
-                          });
-  }
-  var isCollection = function(module){
-    return implementsMethods(module, ['collectionGET',
+detour.prototype.isCollection = function(node){
+    return this._implementsMethods(node, ['collectionGET',
                                       'collectionPOST',
                                       'collectionPUT',
                                       'collectionDELETE'])
+}
+
+detour.prototype._implementsMethods = function(node, methods){
+    return _.any(methods, function(method){
+                            return !!node.module[method]
+                          });
   }
+
+detour.prototype.getRoutes = function(app){
+  var routes = []
+  var that = this;
+	var standardMethods = [ "GET", "POST", "DELETE", "PUT"]
+
 	var getNodeRoutes = function(parentPath, node){
 		var path = urlJoin(parentPath, node.path) 
-    if (isCollection(node.module)){
+    if (that.isCollection(node)){
         routes.push({ url : path, resource : node})
         var id_name = ':' + node.path.replace(/\//, '') + '_id'
         path = urlJoin(path, id_name)
     }
-    if (implementsMethods(node.module, standardMethods)){
+    if (that._implementsMethods(node, standardMethods)){
       routes.push({ url : path, resource : node})
       _.each(node.children, function(node){
         getNodeRoutes(path, node);
@@ -60,10 +64,37 @@ detour.prototype.setRoutes = function(app){
   setNodeRoutes(this.mountPath, this.rootResource)
 }
 
+detour.prototype.dispatch = function(req, res){
+  var method = req.method
+  if (req.url.length > 4096){
+    return this.handle415(req, res)
+  }
+  try {
+    var route = this.matchRoute(req.url)
+    var resource = route.resource;
+  } catch (ex) {
+    if (ex == "No matching route found."){
+      return this.handle404(req, res)
+    } else {
+      throw ex;
+    }
+  }
+  if (!resource.module[method]){
+    return this.handle405(req, res)
+  }
+  resource.module[method](req, res)
+}
 
-detour.prototype.dispatch = function(req, res, next){
-  var resource = this.getRoute('/')
-  resource.module.GET(req, res)
+detour.prototype.handle415 = function(req, res){
+  res.send(414)
+}
+
+detour.prototype.handle404 = function(req, res){
+  res.send(404)
+}
+
+detour.prototype.handle405 = function(req, res){
+  res.send(405)
 }
 
 detour.prototype.getUrl = function(node){
@@ -76,6 +107,27 @@ detour.prototype.getUrl = function(node){
   var pieces = _.flatten(getAncestry(node));
   var url = urlJoin(this.mountPath, pieces);
   return url;
+}
+
+detour.prototype.matchRoute = function(urlstr){
+  // go through all the getRoutes() urls and find the first match
+  var path = urlJoin(url.parse(urlstr).path)
+  var route =_.find(this.getRoutes(), function(routeObj){
+    // swap out wildcard path pieces...
+    var matcher = routeObj.url.replace(/:[^/]+/, "[^/]+")
+    // escape slashes and mark beginning/end
+    matcher = "^" + matcher.replace(/\//g, '\\/') + "$"
+    var re = new RegExp(matcher)
+    var matches = path.match(new RegExp(matcher))
+    if (path.match(new RegExp(matcher))){
+      return true
+    }
+    return false;
+  });
+  if (!route){
+    throw "No matching route found."
+  }
+  return route;
 }
 
 detour.prototype.getRoute = function(urlstr){
