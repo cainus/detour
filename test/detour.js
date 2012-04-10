@@ -33,6 +33,7 @@ TODOS:
 - does it work with filesystem tree?
 - save getRoutes() for dispatch()s repeated use
 - get rid of setRoutes?
+- 503, 501 handlers
 - preliminary documentation
 - getChildUrls(node) returns the urls of the kids of a given node
 - support adding routes on-the-fly
