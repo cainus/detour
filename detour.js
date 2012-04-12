@@ -2,9 +2,14 @@ var ResourceTree = require('./lib/ResourceTree').ResourceTree
 var _ = require('underscore');
 var url = require('url');
 
-function detour(mountPath){
+function detour(mountPath, module){
+  mountPath = mountPath || '/'
+  if (!module){
+    throw "detour must be instantiated with a url path to route from and a module to handle response.";
+  }
 	this.mountPath = urlJoin('/', mountPath);
-  this.rootResource = new ResourceTree('/', {})	
+  this.rootResource = new ResourceTree('/', {})
+  this.rootResource.module = module
 }
 
 detour.prototype.isCollection = function(node){
@@ -20,7 +25,7 @@ detour.prototype._implementsMethods = function(node, methods){
                           });
   }
 
-detour.prototype.getRoutes = function(app){
+detour.prototype.getRouteTable = function(){
   var routes = []
   var that = this;
 	var standardMethods = [ "GET", "POST", "DELETE", "PUT"]
@@ -97,6 +102,37 @@ detour.prototype.handle405 = function(req, res){
   res.send(405)
 }
 
+//detour.prototype.handleOPTIONS = function(req, res){
+//
+//}
+
+
+// TODO make sure trailing slashes don't affect this
+detour.prototype.addRoute = function(path, module){
+  var allMethods = ["GET", "POST",
+                    "DELETE", "PUT",
+                    "collectionGET", "collectionPOST",
+                    "collectionPUT", "collectionDELETE"]
+  if (!this._implementsMethods({module: module}, allMethods)){
+    throw 'The handler you tried to add for path /api/x has not valid HTTP methods.'
+  };
+  var pieces = path.split('/');
+  var kidName = pieces.pop()
+  var parent_url = urlJoin(pieces)
+  try {
+   var parentRoute = this.getRoute(parent_url);
+  } catch (ex){
+    if (ex == 'That route does not exist: ' + parent_url + '.'){
+      throw "Cannot add resource to a parent path that does not exist."
+    }
+  }
+  if (!this._implementsMethods(parentRoute, allMethods)){
+    throw "Cannot add resource to a parent path that does not exist."
+  }
+  parentRoute.addChild(kidName, module)
+}
+
+
 detour.prototype.getUrl = function(node){
   var getAncestry = function(node){
     if (!node.parentNode){
@@ -110,9 +146,9 @@ detour.prototype.getUrl = function(node){
 }
 
 detour.prototype.matchRoute = function(urlstr){
-  // go through all the getRoutes() urls and find the first match
+  // go through all the getRouteTable() urls and find the first match
   var path = urlJoin(url.parse(urlstr).path)
-  var route =_.find(this.getRoutes(), function(routeObj){
+  var route =_.find(this.getRouteTable(), function(routeObj){
     // swap out wildcard path pieces...
     var matcher = routeObj.url.replace(/:[^/]+/, "[^/]+")
     // escape slashes and mark beginning/end

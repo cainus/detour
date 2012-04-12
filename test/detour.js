@@ -8,6 +8,7 @@ CONSTRAINTS:
 * routes shouldn't really have anything to do with methods
 * we want collections and their members in the same file, so they 
 can share code easily.
+* sparse routes suck and are unnecessary
 * collections can be auto-detected by the existance of collection methods
 * routes should be easily readable/writable by framework and resources
 * make fs-based routing awesome but not required
@@ -27,11 +28,12 @@ end-of-the-line for bad routes.  this can be remedied later if it's a problem.
 TODOS:
 - support sub resources of collections
 - support OPTIONS
+- support TRACE
 - test with real app!
 - does it work on plain express?
 - does it work on plain connect?
 - does it work with filesystem tree?
-- save getRoutes() for dispatch()s repeated use
+- save getRouteTable() for dispatch()s repeated use
 - get rid of setRoutes?
 - 503, 501 handlers
 - preliminary documentation
@@ -60,6 +62,7 @@ var detour = require('../detour').detour;
 describe('detour', function(){
 	beforeEach(function(){
 		//this.app = express.createServer();
+    this.simpleModule = {GET : function(req, res){res.send("OK");}}
 	})
 	afterEach(function(){
     try {
@@ -69,90 +72,120 @@ describe('detour', function(){
     }
 	})
   
-	// mount path is the url prefix that will be used for all routes
-	// the resource tree is the tree of 'resources' that will be mounted
-	it ("has a ctor for setting mount path and initializing resource tree",
-		 function(){
-				var d = new detour('api')
-				d.mountPath.should.equal('/api');
-				should.exist(d.rootResource);
-		 }
-  );
-
-	describe('#getRoutes', function(){
-    it ("should be an empty list when there's an empty resource tree and a mount path",
-      function(){
-        var d = new detour('api')
-        d.getRoutes().length.should.equal(0);
+  describe("constructor", function(){
+    // mount path is the url prefix that will be used for all routes
+    // the resource tree is the tree of 'resources' that will be mounted
+    it ("can set mount path and root module",
+       function(){
+          var d = new detour('api', this.simpleModule)
+          d.mountPath.should.equal('/api');
+          should.exist(d.rootResource);
+       }
+    );
+    it ("throws an exception if params are invalid", function(){
+      try {
+        var d = new detour();
+        should.fail("an expected exception was not raised")
+      } catch (ex) {
+        ex.should.equal("detour must be instantiated with a url path to route from and a module to handle response.")
       }
-    )
-    it ("should be an empty list when there's an empty resource tree and no mount path",
-      function(){
-			  var d = new detour('')
-        d.getRoutes().length.should.equal(0);
-      }
-    )
-    it ("has a simple route when one exists in the resource tree", function(){
-			var d = new detour('api')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
-      var routes = d.getRoutes()
-      routes.length.should.equal(1);
-      routes[0].url.should.equal("/api")
     })
+  });
+
+
+	describe('#getRouteTable', function(){
+    it ("should have a single route after first instantiation",
+      function(){
+        var d = new detour('api', this.simpleModule)
+        var routes = d.getRouteTable()
+        routes.length.should.equal(1);
+        routes[0].url.should.equal("/api")
+      }
+    )
     it ("has two routes for a simple parent/child relationship", function(){
-			var d = new detour('api')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+      var d = new detour('api', this.simpleModule)
 			d.rootResource.addChild('other', 
 															{GET : function(req, res){res.send("OK 2 !")}});
-      var routes = d.getRoutes()
+      var routes = d.getRouteTable()
       routes.length.should.equal(2);
       routes[0].url.should.equal("/api")
       routes[1].url.should.equal("/api/other")
     })
     it ("can route collections", function(){
-			var d = new detour('api')
-			d.rootResource.module = {collectionGET : function(req, res){res.send("OK!")}}
-      var routes = d.getRoutes()
+			var d = new detour('api', {collectionGET : function(req, res){res.send("OK!")}});
+      var routes = d.getRouteTable()
       routes.length.should.equal(1);
       routes[0].url.should.equal("/api")
     })
     it ("can route root collection members", function(){
-			var d = new detour('api')
-			d.rootResource.module = { collectionGET : function(req, res){res.send("OK!")},
-                                GET : function(req, res){res.send("member OK!")}
-      }
-      var routes = d.getRoutes()
+			var d = new detour('api', this.simpleModule)
+			d.rootResource.module.collectionGET = function(req, res){res.send("OK!")};
+      var routes = d.getRouteTable()
       routes.length.should.equal(2);
       routes[0].url.should.equal("/api")
       routes[1].url.should.equal("/api/:_id")
     })
     it ("can route sub-root collection members", function(){
-			var d = new detour('api')
-			d.rootResource.module = { GET : function(req, res){res.send("root");} }
+			var d = new detour('api', this.simpleModule)
 			d.rootResource.addChild('other', 
         { collectionGET : function(req, res){res.send("OK!")},
           GET : function(req, res){res.send("member OK!")}
         }
       );
-      var routes = d.getRoutes()
+      var routes = d.getRouteTable()
       routes.length.should.equal(3);
       routes[0].url.should.equal("/api")
       routes[1].url.should.equal("/api/other")
       routes[2].url.should.equal("/api/other/:other_id")
     })
+    it ("sets a default OPTIONS handler on every resource", function(){
+      //res.header('Allow', 'OPTIONS,POST')
+      // TODO
+      
+    })
+  });
+
+  describe('#addRoute', function(){
+    it ("throws an exception if the parent of the path doesn't exist", function(){
+			var d = new detour('api', this.simpleModule)
+      try {
+        d.addRoute('/api/x/y', this.simpleModule)
+        should.fail("expected exception was not thrown")
+      } catch (ex) {
+        ex.should.equal("Cannot add resource to a parent path that does not exist.")
+      }
+    })
+    it ("throws an exception if the module doesn't implement any methods", function(){
+			var d = new detour('api', this.simpleModule)
+      try {
+        d.addRoute('/api/x', {})
+        should.fail("expected exception was not thrown");
+      } catch (ex ){
+        ex.should.equal('The handler you tried to add for path /api/x has not valid HTTP methods.')
+      }
+    });
+    it ("can add a route to the root path", function(){
+			var d = new detour('api', this.simpleModule)
+      d.addRoute('/api/x', this.simpleModule)
+      d.getRouteTable().length.should.equal(2)
+    });
+    it ("can add a route if the parent of the path exists", function(){
+			var d = new detour('api', this.simpleModule)
+      d.addRoute('/api/x', this.simpleModule)
+      d.addRoute('/api/x/y', this.simpleModule)
+    });
   });
 
 	describe('#setRoutes', function(){
 		it ("doesn't set anything with the default resource tree", function(){
-			var d = new detour('api')
+			var d = new detour('api', this.simpleModule)
 			var app = express.createServer();
 			d.setRoutes(app)
 			var routes = app.lookup.all('/api')
-			should.not.exist(routes['0']) 
+			should.exist(routes['0']) 
 		})
 		it ("sets a simple GET route when one exists in the resource tree", function(){
-			var d = new detour('api')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			var d = new detour('api', this.simpleModule)
 			var app = express.createServer();
 			d.setRoutes(app)
 			var routes = app.lookup.all('/api/')
@@ -162,8 +195,7 @@ describe('detour', function(){
 			routes['0'].method.should.equal("get")
 		})
 		it ("sets a simple POST route when one exists in the resource tree", function(){
-			var d = new detour('api')
-			d.rootResource.module = {POST : function(req, res){res.send("OK!")}}
+			var d = new detour('api',{POST : function(req, res){res.send("OK!")}})
 			var app = express.createServer();
 			d.setRoutes(app)
 			var routes = app.lookup.all('/api/')
@@ -173,8 +205,7 @@ describe('detour', function(){
 			routes['0'].method.should.equal("post")
 		})
 		it ("sets a simple DELETE route when one exists in the resource tree", function(){
-			var d = new detour('api')
-			d.rootResource.module = {DELETE : function(req, res){res.send("OK!")}}
+			var d = new detour('api', {DELETE : function(req, res){res.send("OK!")}})
 			var app = express.createServer();
 			d.setRoutes(app)
 			var routes = app.lookup.all('/api/')
@@ -182,8 +213,7 @@ describe('detour', function(){
 			routes['0'].method.should.equal("delete")
 		})
 		it ("sets a simple OPTIONS route when one exists in the resource tree", function(){
-			var d = new detour('api')
-			d.rootResource.module = {OPTIONS : function(req, res){res.send("OK!")}}
+			var d = new detour('api', {OPTIONS : function(req, res){res.send("OK!")}})
 			var app = express.createServer();
 			d.setRoutes(app)
 			var routes = app.lookup.all('/api/')
@@ -191,8 +221,7 @@ describe('detour', function(){
 			routes['0'].method.should.equal("options")
 		})
 		it ("sets a simple PUT route when one exists in the resource tree", function(){
-			var d = new detour('api')
-			d.rootResource.module = {PUT : function(req, res){res.send("OK!")}}
+			var d = new detour('api', {PUT : function(req, res){res.send("OK!")}})
 			var app = express.createServer();
 			d.setRoutes(app)
 			var routes = app.lookup.all('/api/')
@@ -200,8 +229,7 @@ describe('detour', function(){
 			routes['0'].method.should.equal("put")
 		})
 		it ("sets can set paths for simple non-root resources", function(done){
-			var d = new detour('api')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			var d = new detour('api', this.simpleModule)
 			d.rootResource.addChild('other', 
 															{GET : function(req, res){res.send("OK 2 !")}});
       var app = this.app = express.createServer();
@@ -230,18 +258,15 @@ describe('detour', function(){
 
 	describe('#getUrl', function(){
     it ("returns the url for a root node with an empty mountPath as /", function(){
-			var d = new detour('')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			var d = new detour('', this.simpleModule)
       d.getUrl(d.rootResource).should.equal("/");
     });
     it ("returns the url for a root node with a non empty mountPath", function(){
-			var d = new detour('api')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			var d = new detour('api', this.simpleModule)
       d.getUrl(d.rootResource).should.equal("/api");
     });
     it ("returns the url for a child node", function(){
-			var d = new detour('api')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			var d = new detour('api', this.simpleModule)
 			d.rootResource.addChild('other', 
 															{GET : function(req, res){res.send("OK 2 !")}});
       d.getUrl(d.rootResource.children[0]).should.equal("/api/other");
@@ -252,22 +277,19 @@ describe('detour', function(){
 	describe('#getRoute', function(){
     // takes a url and returns the matching route node
     it ("takes a mountPath and returns the root node", function(){
-			var d = new detour('api')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			var d = new detour('api', this.simpleModule)
       var node = d.getRoute('/api/')
       should.not.exist(node.parentNode)
       node.path.should.equal('/')
     });
     it ("takes an empty mountPath and returns the root node", function(){
-			var d = new detour('')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			var d = new detour('api', this.simpleModule)
       var node = d.getRoute('/')
       should.not.exist(node.parentNode)
       node.path.should.equal('/')
     });
     it ("takes a simple child path and returns that node", function(){
-			var d = new detour('api')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			var d = new detour('api', this.simpleModule)
 			d.rootResource.addChild('other', 
 															{GET : function(req, res){res.send("OK 2 !")}});
       var node = d.getRoute('/api/other')
@@ -275,17 +297,8 @@ describe('detour', function(){
       node.parentNode.path.should.equal('/')
       node.path.should.equal('other')
     });
-    it ("throws an exception if no routes exist", function(){
-			var d = new detour('api')
-      try {
-        var node = d.getRoute('/api/other')
-        should.fail("an expected exception was not thrown!")
-      } catch(ex){
-        ex.should.equal("That route does not exist: /api/other.")
-      }
-    })
     it ("throws an exception if no route exists", function(){
-			var d = new detour('')
+			var d = new detour('api', this.simpleModule)
       try {
         var node = d.getRoute('/doesNotExist')
         should.fail("an expected exception was not thrown!")
@@ -297,22 +310,19 @@ describe('detour', function(){
 
   describe('#matchRoute', function(){
     it ("takes a root path and returns that node", function(){
-			var d = new detour('api')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			var d = new detour('api', this.simpleModule)
       var route = d.matchRoute('/api/')
       route.url.should.equal('/api')
     });
     it ("takes a simple child path and returns that node", function(){
-			var d = new detour('api')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			var d = new detour('api', this.simpleModule)
 			d.rootResource.addChild('other', 
 															{GET : function(req, res){res.send("OK 2 !")}});
       var route = d.matchRoute('/api/other/')
       route.url.should.equal('/api/other')
     });
     it ("takes a collection member path and returns that node", function(){
-			var d = new detour('api')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			var d = new detour('api', this.simpleModule)
 			d.rootResource.addChild('other', 
 															{GET : function(req, res){
                                         res.send("OK 2 !")
@@ -325,7 +335,7 @@ describe('detour', function(){
       route.url.should.equal('/api/other/:other_id')
     });
     it ("throws an exception if no match is found", function(){
-			var d = new detour('api')
+			var d = new detour('', this.simpleModule)
       try {
         var route = d.matchRoute('/api/')
         should.fail("expected exception was not thrown!")
@@ -337,9 +347,8 @@ describe('detour', function(){
 
 
   describe('#dispatch', function(){
-    
     it ("finds and runs a GET handler at the root path", function(){
-			var d = new detour('')
+			var d = new detour('', this.simpleModule)
       var response = "";
 			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
       var res = {send : function(str){ response = str;}}
@@ -348,7 +357,7 @@ describe('detour', function(){
       response.should.equal("OK!")
     });
     it ("finds and runs a POST handler at the root path", function(){
-			var d = new detour('')
+			var d = new detour('', this.simpleModule)
       var response = "";
 			d.rootResource.module = {POST : function(req, res){res.send("OK!")}}
       var res = {send : function(str){ response = str;}}
@@ -357,7 +366,7 @@ describe('detour', function(){
       response.should.equal("OK!")
     });
     it ("finds and runs a GET handler at a sub path", function(){
-			var d = new detour('')
+			var d = new detour('', this.simpleModule)
       var response = "";
 			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
 			d.rootResource.addChild('other', 
@@ -369,7 +378,7 @@ describe('detour', function(){
 
     });
     it ("404s when it's passed a bad path", function(){
-			var d = new detour('')
+			var d = new detour('', this.simpleModule)
       var response = "NOT OK";
       var status = 200
       var req = { method : "GET", url : 'http://localhost:9999/doesNotExist'}
@@ -379,10 +388,9 @@ describe('detour', function(){
       status.should.equal(404)
     });
     it ("405s when the method doesn't exist", function(){
-			var d = new detour('')
+			var d = new detour('', this.simpleModule)
       var response = "NOT OK";
       var status = 200
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
       var req = { method : "PUT", url : 'http://localhost:9999/'}
       var res = {send : function(code, body){ response = body; status = code;}}
       d.dispatch(req, res)
@@ -394,10 +402,9 @@ describe('detour', function(){
       for(var i = 0; i < 500; i++){
         url += '1234567890';
       }
-			var d = new detour('')
+			var d = new detour('', this.simpleModule)
       var response = "NOT OK";
       var status = 200
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
       var req = { method : "GET", url : url}
       var res = {send : function(code, body){ response = body; status = code;}}
       d.dispatch(req, res)
@@ -405,9 +412,8 @@ describe('detour', function(){
       status.should.equal(414)
     });
     it ("finds and runs a GET handler on a member of a collection", function(){
-			var d = new detour('')
+			var d = new detour('', this.simpleModule)
       var response = "";
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
 			d.rootResource.addChild('other', 
 															{GET : function(req, res){res.send("OK 2 !")},
                                collectionGET : function(req, res){res.send("collection OK!")}}
@@ -421,9 +427,9 @@ describe('detour', function(){
 
 	describe('#getParentUrl', function(){
     it ("throws an exception when getting the parent url of a root node", function(){
-			var d = new detour('')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			var d = new detour('', this.simpleModule)
       try {
+        console.log(d.getParentUrl(d.rootResource))
         d.getParentUrl(d.rootResource).should.equal("/");
         should.fail("unexpected exception was thrown")
       } catch (ex) {
@@ -431,8 +437,7 @@ describe('detour', function(){
       }
     });
     it ("returns the parent url for a child path correctly", function(){
-			var d = new detour('api')
-			d.rootResource.module = {GET : function(req, res){res.send("OK!")}}
+			var d = new detour('api', this.simpleModule)
 			d.rootResource.addChild('other', 
 															{GET : function(req, res){res.send("OK 2 !")}});
       d.getParentUrl(d.rootResource.children[0]).should.equal("/api");
