@@ -5,7 +5,7 @@ var _ = require('underscore');
 /*
 
 CONSTRAINTS:
-* routes shouldn't really have anything to do with methods
+* http method should not really have anything to do with routing
 * we want collections and their members in the same file, so they 
 can share code easily.
 * sparse routes suck and are unnecessary
@@ -27,6 +27,8 @@ end-of-the-line for bad routes.  this can be remedied later if it's a problem.
 
 TODOS:
 - support sub resources of collections
+- got to capture variables in the url and set params[]
+- getUrl should take an options hash of variables to interpolate
 - support OPTIONS
 - support TRACE
 - test with real app!
@@ -63,6 +65,10 @@ describe('detour', function(){
 	beforeEach(function(){
 		//this.app = express.createServer();
     this.simpleModule = {GET : function(req, res){res.send("OK");}}
+    this.simpleCollectionModule = {  
+                                    GET : function(req, res){res.send("OK");},
+                                    collectionGET : function(req, res){res.send("OK");}
+                                  }
 	})
 	afterEach(function(){
     try {
@@ -139,6 +145,8 @@ describe('detour', function(){
       routes[2].url.should.equal("/api/other/:other_id")
     })
     it ("sets a default OPTIONS handler on every resource", function(){
+			var d = new detour('api', this.simpleModule)
+      
       //res.header('Allow', 'OPTIONS,POST')
       // TODO
       
@@ -173,6 +181,14 @@ describe('detour', function(){
 			var d = new detour('api', this.simpleModule)
       d.addRoute('/api/x', this.simpleModule)
       d.addRoute('/api/x/y', this.simpleModule)
+      d.getRouteTable().length.should.equal(3)
+    });
+    it ("can add a sub resource of a collection", function(){
+			var d = new detour('api', this.simpleModule)
+      d.addRoute('/api/x', {GET : function(req, res){res.send("OK")},
+                            collectionGET : function(req, res){res.send("OK2")}})
+      d.addRoute('/api/x/:x_id/y', this.simpleModule)
+      d.getRouteTable().length.should.equal(4)
     });
   });
 
@@ -290,9 +306,24 @@ describe('detour', function(){
     });
     it ("takes a simple child path and returns that node", function(){
 			var d = new detour('api', this.simpleModule)
-			d.rootResource.addChild('other', 
-															{GET : function(req, res){res.send("OK 2 !")}});
+			d.rootResource.addChild('other', this.simpleModule);
       var node = d.getRoute('/api/other')
+      should.exist(node.parentNode)
+      node.parentNode.path.should.equal('/')
+      node.path.should.equal('other')
+    });
+    it ("takes a collection path and returns that node", function(){
+			var d = new detour('api', this.simpleModule)
+			d.rootResource.addChild('other', this.simpleCollectionModule);
+      var node = d.getRoute('/api/other')
+      should.exist(node.parentNode)
+      node.parentNode.path.should.equal('/')
+      node.path.should.equal('other')
+    });
+    it ("takes a collection member path and returns that node", function(){
+			var d = new detour('api', this.simpleModule)
+			d.rootResource.addChild('other', this.simpleCollectionModule);
+      var node = d.getRoute('/api/other/1234')
       should.exist(node.parentNode)
       node.parentNode.path.should.equal('/')
       node.path.should.equal('other')
@@ -308,22 +339,22 @@ describe('detour', function(){
     })
   });
 
-  describe('#matchRoute', function(){
+  describe('#requestUrlToRoute', function(){
     it ("takes a root path and returns that node", function(){
 			var d = new detour('api', this.simpleModule)
-      var route = d.matchRoute('/api/')
+      var route = d.requestUrlToRoute('/api/')
       route.url.should.equal('/api')
     });
     it ("takes a simple child path and returns that node", function(){
 			var d = new detour('api', this.simpleModule)
 			d.rootResource.addChild('other', 
 															{GET : function(req, res){res.send("OK 2 !")}});
-      var route = d.matchRoute('/api/other/')
+      var route = d.requestUrlToRoute('/api/other/')
       route.url.should.equal('/api/other')
     });
     it ("takes a collection member path and returns that node", function(){
 			var d = new detour('api', this.simpleModule)
-			d.rootResource.addChild('other', 
+      d.rootResource.addChild('other', 
 															{GET : function(req, res){
                                         res.send("OK 2 !")
                                      },
@@ -331,13 +362,13 @@ describe('detour', function(){
                                                   res.send("coll GET!")
                                                }
                               });
-      var route = d.matchRoute('/api/other/4lph4num3r1c')
+      var route = d.requestUrlToRoute('/api/other/4lph4num3r1c')
       route.url.should.equal('/api/other/:other_id')
     });
     it ("throws an exception if no match is found", function(){
 			var d = new detour('', this.simpleModule)
       try {
-        var route = d.matchRoute('/api/')
+        var route = d.requestUrlToRoute('/api/')
         should.fail("expected exception was not thrown!")
       } catch (ex) {
         ex.should.equal("No matching route found.")
@@ -364,7 +395,16 @@ describe('detour', function(){
       var req = { method : "POST", url : 'http://localhost:9999/'}
       d.dispatch(req, res) 
       response.should.equal("OK!")
-    });
+    });/*
+    it ("runs a default OPTIONS handler at the root path when one doesn't exist", function(){
+			var d = new detour('', this.simpleModule)
+      var response = "";
+			d.rootResource.module = {POST : function(req, res){res.send("OK!")}}
+      var res = {send : function(str){ response = str;}}
+      var req = { method : "OPTIONS", url : 'http://localhost:9999/'}
+      d.dispatch(req, res)
+      response.should.equal("")
+    });*/
     it ("finds and runs a GET handler at a sub path", function(){
 			var d = new detour('', this.simpleModule)
       var response = "";

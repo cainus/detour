@@ -75,7 +75,7 @@ detour.prototype.dispatch = function(req, res){
     return this.handle415(req, res)
   }
   try {
-    var route = this.matchRoute(req.url)
+    var route = this.requestUrlToRoute(req.url)
     var resource = route.resource;
   } catch (ex) {
     if (ex == "No matching route found."){
@@ -145,26 +145,76 @@ detour.prototype.getUrl = function(node){
   return url;
 }
 
-detour.prototype.matchRoute = function(urlstr){
-  // go through all the getRouteTable() urls and find the first match
-  var path = urlJoin(url.parse(urlstr).path)
-  var route =_.find(this.getRouteTable(), function(routeObj){
+// TODO put the urlRegex in the routes table so we don't keep creating it
+// for faster route lookup
+detour.prototype._pathMatchesRouteUrl = function(path, url){
     // swap out wildcard path pieces...
-    var matcher = routeObj.url.replace(/:[^/]+/, "[^/]+")
+    var matcher = url.replace(/:[^/]+/, "[^/]+")
     // escape slashes and mark beginning/end
     matcher = "^" + matcher.replace(/\//g, '\\/') + "$"
     var re = new RegExp(matcher)
-    var matches = path.match(new RegExp(matcher))
+    var matches = path.match(re)
     if (path.match(new RegExp(matcher))){
       return true
     }
     return false;
+}
+
+detour.prototype._requestPathToRoute = function(path){
+  var that = this;
+  var urls = _.pluck(this.getRouteTable(), "url")
+  var route = _.find(this.getRouteTable(), function(entry){
+    return that._pathMatchesRouteUrl(path, entry.url)
   });
   if (!route){
     throw "No matching route found."
   }
   return route;
 }
+
+detour.prototype.requestUrlToRoute = function(urlstr){
+  // go through all the getRouteTable() urls and find the first match
+  var path = urlJoin(url.parse(urlstr).path)
+  return this._requestPathToRoute(path);
+}
+
+detour.prototype.traversePaths = function(node, paths){
+    var getKidByPath = function(node, path){
+      var kid = _.find(node.children, function(kid){
+        return kid.path == path;
+      });
+      if (!kid){
+        throw "The given node does not have a child matching the given path."
+      }
+      return kid;
+    }
+
+    if (paths.length == 0){
+      return node;
+    }
+
+    var path = paths[0];
+    paths = _.rest(paths);
+    if (this.isCollection(node)){
+      // skip one piece if it's a collection.
+      if (paths.length == 0){
+        return node;
+      } else {
+        // TODO! when a collection member has sub resources
+      }
+    }
+
+    try {
+      node = getKidByPath(node, path);
+    } catch(ex) {
+      if (ex == "The given node does not have a child matching the given path."){
+        throw "Unknown path"
+      } else {
+        throw ex;
+      }
+    }
+    return this.traversePaths(node, paths)
+  }
 
 detour.prototype.getRoute = function(urlstr){
   var path = url.parse(urlstr).path
@@ -175,34 +225,8 @@ detour.prototype.getRoute = function(urlstr){
   if (urlJoin('/', pieces[0]) == this.mountPath){
     pieces = _.rest(pieces);
   }
-  var getKidByPath = function(node, path){
-    var kid = _.find(node.children, function(kid){
-      return kid.path == path;
-    });
-    if (!kid){
-      throw "The given node does not have a child matching the given path."
-    }
-    return kid;
-  }
-  var traverse = function(node, paths){
-    if (paths.length == 0){
-      return node;
-    }
-    var path = paths[0];
-    paths = _.rest(paths);
-    try {
-      node = getKidByPath(node, path);
-    } catch(ex) {
-      if (ex == "The given node does not have a child matching the given path."){
-        throw "Unknown path"
-      } else {
-        throw ex;
-      }
-    }
-    return traverse(node, paths)
-  }
   try {
-    return traverse(this.rootResource, pieces);
+    return this.traversePaths(this.rootResource, pieces);
   } catch (ex ){
       if (ex == "Unknown path"){
         throw "That route does not exist: " + urlstr + "."
