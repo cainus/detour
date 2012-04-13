@@ -19,36 +19,35 @@ router
 in static files can signal to the router that there's a route.  
 programmatic routes then?)
 * ? how to handle sub resources of member resources (sub dir matching 
-collection name)?
+collection name)?  almost certainly.
 * ? how to handle sub resources of regular resources in the fs? (same as above?)
 * ? how to do route-specific middleware like authorization?
 * despite this being middleware, 404's won't fall through.  this is the 
 end-of-the-line for bad routes.  this can be remedied later if it's a problem.
 
 TODOS:
+- might be better to rely on express' HEAD implementation.  the current one is 
+a pain for passing on headers correctly.
 - support sub resources of collections
 - got to capture variables in the url and set params[]
 - getUrl should take an options hash of variables to interpolate
 - handleOPTIONS needs direct tests because it just barely covers what's necessary
 - support OPTIONS
-x support TRACE (nope)
 - test with real app!
 - does it work on plain express?
-- does it work on plain connect?
 - does it work with filesystem tree?
-- save getRouteTable() for dispatch()s repeated use
-- get rid of setRoutes?
-- 503, 501 handlers
 - preliminary documentation
 - getChildUrls(node) returns the urls of the kids of a given node
 - support adding routes on-the-fly
 - custom handlers for 404, 405, 414 (request uri is too long) 
-- what about the HEAD method?
 - programmatic routes?
 - ?? how to do route-specific middleware like authorization?
-- don't allow status codes to be invalid ones.  does express do this for us 
+- don't allow status codes to be invalid ones.  does express do this for us?
 - is there a way for routes to use a return instead of res.send() ??
 though?
+x test what happens if there's an exception in the handler.  500?
+x get rid of setRoutes?
+x 503, 501 handlers (not doing 503 'service unavailable')
 x getRoute(url) returns the route node for that url
 x getURL(routenode) returns the url for a given routenode
 x detour should have a method for applying routes, so that they're not
@@ -56,21 +55,26 @@ applied until the method is called.
 x nodes will need a reference to their parent
 x support collections
 x have defaults for 404, 405, 414
+x support TRACE (nope)
+x what about the HEAD method?
+
+VERSION 2:
+- get it to work on connect?
+- save getRouteTable() for dispatch()s repeated use
+- redirects in the router
+- conditional GET, e-tags, caching, 304
+- cache recent urls / route combinations instead of requiring
+regex lookup?
+- routes that have no dynamic elements should be a simple
+object key lookup (no regex)
+- use 'moved permanently' (301) for case sensitivity problems
+in urls.  this is better for SEO
+- unicode route support ( see https://github.com/ckknight/escort )
+- server could note what's acceptable on all routes and check 406
+have to do?
 
 // NOTE: express 3.0 seems to be necessary for HEAD method support
 //
-TODO test what happens if there's an exception in the handler.  500?
-have to do?  catch any exceptions in handler and 500.
-look at express code for setting params.
-VERSION 2: redirects in the router
-VERSION 2: conditional GET, e-tags, caching, 304
-VERSION 2: cache recent urls / route combinations instead of requiring
-regex lookup?
-VERSION 2: routes that have no dynamic elements should be a simple
-object key lookup (no regex)
-VERSION 2: use 'moved permanently' (301) for case sensitivity problems
-in urls.  this is better for SEO
-VERSION 2: unicode route support ( see https://github.com/ckknight/escort )
 */
 
 var express = require('express');
@@ -79,6 +83,7 @@ var detour = require('../detour').detour;
 
 describe('detour', function(){
 	beforeEach(function(){
+    this.app = {}
 		//this.app = express.createServer();
     this.simpleModule = {GET : function(req, res){res.send("OK");}}
     this.simpleCollectionModule = {  
@@ -88,7 +93,7 @@ describe('detour', function(){
 	})
 	afterEach(function(){
     try {
-      //this.app.close();
+      this.app.close();
     } catch (ex){
       // do nothing. assumed already closed.
     }
@@ -200,86 +205,6 @@ describe('detour', function(){
       d.getRouteTable().length.should.equal(4)
     });
   });
-
-	describe('#setRoutes', function(){
-		it ("doesn't set anything with the default resource tree", function(){
-			var d = new detour('api', this.simpleModule)
-			var app = express.createServer();
-			d.setRoutes(app)
-			var routes = app.lookup.all('/api')
-			should.exist(routes['0']) 
-		})
-		it ("sets a simple GET route when one exists in the resource tree", function(){
-			var d = new detour('api', this.simpleModule)
-			var app = express.createServer();
-			d.setRoutes(app)
-			var routes = app.lookup.all('/api/')
-			should.exist(routes['0']) 
-			routes = app.lookup.all('/api')
-			should.exist(routes['0']) 
-			routes['0'].method.should.equal("get")
-		})
-		it ("sets a simple POST route when one exists in the resource tree", function(){
-			var d = new detour('api',{POST : function(req, res){res.send("OK!")}})
-			var app = express.createServer();
-			d.setRoutes(app)
-			var routes = app.lookup.all('/api/')
-			should.exist(routes['0']) 
-			routes = app.lookup.all('/api')
-			should.exist(routes['0']) 
-			routes['0'].method.should.equal("post")
-		})
-		it ("sets a simple DELETE route when one exists in the resource tree", function(){
-			var d = new detour('api', {DELETE : function(req, res){res.send("OK!")}})
-			var app = express.createServer();
-			d.setRoutes(app)
-			var routes = app.lookup.all('/api/')
-			should.exist(routes['0']) 
-			routes['0'].method.should.equal("delete")
-		})
-		it ("sets a simple OPTIONS route when one exists in the resource tree", function(){
-			var d = new detour('api', {OPTIONS : function(req, res){res.send("OK!")}})
-			var app = express.createServer();
-			d.setRoutes(app)
-			var routes = app.lookup.all('/api/')
-			should.exist(routes['0']) 
-			routes['0'].method.should.equal("options")
-		})
-		it ("sets a simple PUT route when one exists in the resource tree", function(){
-			var d = new detour('api', {PUT : function(req, res){res.send("OK!")}})
-			var app = express.createServer();
-			d.setRoutes(app)
-			var routes = app.lookup.all('/api/')
-			should.exist(routes['0']) 
-			routes['0'].method.should.equal("put")
-		})
-		it ("sets can set paths for simple non-root resources", function(done){
-			var d = new detour('api', this.simpleModule)
-			d.rootResource.addChild('other', 
-															{GET : function(req, res){res.send("OK 2 !")}});
-      var app = this.app = express.createServer();
-			d.setRoutes(app)
-			var routes = app.lookup.all('/api/')
-			should.exist(routes['0'])
-			routes['0'].method.should.equal("get")
-			var routes = app.lookup.all('/api/other')
-			should.exist(routes['0']) 
-			routes['0'].method.should.equal("get")
-      var url = "http://localhost:9999/api/"
-      app.listen(9999, function(){
-        hottap(url).request("GET", function(err, result){
-          result.status.should.equal(200);
-          var url = "http://localhost:9999/api/other"
-          hottap(url).request("GET", function(err, result){
-            result.status.should.equal(200)
-            done();
-          });
-        });
-      });
-
-		});
-  });
-
 
 	describe('#getUrl', function(){
     // TODO needs to handle urls with variables!
@@ -407,9 +332,11 @@ describe('detour', function(){
             var status = '';
             var req = { method : "HEAD", url : "http://localhost:9999/api"}
             var res = {send : function(code, body){ status = code;
-            should.not.exist(body)}}
+                                body.should.equal('')
+                              }
+                      }
             d.dispatch(req, res);
-            status.should.equal(200)
+            status.should.equal(204)
     })
     it ("HEAD calls GET with a status code, but does not have a body",
         function(){
@@ -422,9 +349,11 @@ describe('detour', function(){
             var status = '';
             var req = { method : "HEAD", url : "http://localhost:9999/api"}
             var res = {send : function(code, body){ status = code;
-            should.not.exist(body)}}
+                                body.should.equal('')
+                              }
+                      }
             d.dispatch(req, res);
-            status.should.equal(200)
+            status.should.equal(204)
     })
 
     it ("HEAD on collections calls collectionGET, but has no body", function(){
@@ -432,11 +361,11 @@ describe('detour', function(){
       var status = '';
       var req = { method : "HEAD", url : "http://localhost:9999/api"}
       var res = {send : function(code, body){ status = code;
-                              should.not.exist(body)
+                              body.should.equal('')
                         }
                 }
       d.dispatch(req, res);
-      status.should.equal(200)
+      status.should.equal(204)
     })
 
 
@@ -508,7 +437,7 @@ describe('detour', function(){
                   header : function(k, v){headerkey = k; headervalue = v;}}
       var req = { method : "OPTIONS", url : 'http://localhost:9999/'}
       d.dispatch(req, res)
-      response.should.equal(200)
+      response.should.equal(204)
       headerkey.should.equal('Allow')
       headervalue.should.equal('OPTIONS,POST')
     });
@@ -523,7 +452,7 @@ describe('detour', function(){
                  header : function(k,v){ headerkey = k;  headervalue = v;}}
       var req = { method : "OPTIONS", url : 'http://localhost:9999/subby'}
       d.dispatch(req, res)
-      response.should.equal(200)
+      response.should.equal(204)
       headerkey.should.equal('Allow')
       headervalue.should.equal('OPTIONS,POST')
     });
@@ -541,8 +470,6 @@ describe('detour', function(){
 
     });
     it ("finds and runs a GET handler on a collection itself", function(){
-      // TODO!!
-      // good test, doesn't pass
 			var d = new detour('', this.simpleModule)
       var response = "";
 			d.rootResource.addChild('other', 
@@ -554,6 +481,98 @@ describe('detour', function(){
       d.dispatch(req, res) 
       response.should.equal('collection OK!')
     });
+
+    // TODO
+    it ("finds and runs a GET handler on a collection member");
+
+    // TODO
+    it ("finds and runs a GET handler on a collection member sub resource");
+
+    it ("500s when the handler throws an exception", function(done){
+      var d = new detour('api', {GET : function(req, res){throw "wthizzle";}})
+      var app = this.app = express.createServer();
+      app.use(function(req, res){ d.dispatch(req, res);} );
+      var url = "http://localhost:9999/api/"
+      app.listen(9999, function(){
+        hottap(url).request("GET", function(err, result){
+          result.status.should.equal(500);
+          result.body.should.equal("wthizzle")
+          done();
+        });
+      });
+    })
+
+    it ("works with express for simple root route", function(done){
+      var d = new detour('api', this.simpleModule)
+      var app = this.app = express.createServer();
+      app.use(function(req, res){ d.dispatch(req, res);} );
+      var url = "http://localhost:9999/api/"
+      app.listen(9999, function(){
+        hottap(url).request("GET", function(err, result){
+          result.status.should.equal(200);
+          result.body.should.equal("OK")
+          done();
+        });
+      });
+    })
+
+    it ("works with express for simple sub route", function(done){
+      var d = new detour('api', this.simpleModule)
+			d.addRoute('/api/other',
+															{GET : function(req, res){res.send("OK 2 !")}});
+      var app = this.app = express.createServer();
+      app.use(function(req, res){ d.dispatch(req, res);} );
+      var url = "http://localhost:9999/api/"
+      app.listen(9999, function(){
+        var url = "http://localhost:9999/api/other"
+        hottap(url).request("GET", function(err, result){
+          result.status.should.equal(200)
+          result.body.should.equal("OK 2 !")
+          done();
+        });
+      });
+    })
+
+    // TODO
+    it ("works with express for simple child route");
+
+    // TODO
+    it ("works with express for collection route");
+
+    // TODO
+    it ("works with express for collection member route");
+
+    // TODO
+    it ("works with express for collection sub resource route");
+
+    // express doesn't seem to route bad methods to middleware,
+    // so I can't check for 501 scenarios and handle them.
+    // I'm leaving this commented for now.
+    /*
+    it ("express returns 501 for bad method", function(done){
+      var d = new detour('', this.simpleModule)
+      var app = this.app = express.createServer();
+      //app.use(function(req, res){ d.dispatch(req, res);} );
+      app.get('/', function(req, res){res.send("TEST");})
+      app.listen(9999, function(){
+        var url = "http://localhost:9999/"
+        hottap(url).request("WTF", function(err, result){
+          console.log(err)
+          console.log(result);
+          //result.status.should.equal(200)
+          //result.body.should.equal("OK 2 !")
+          done();
+        });
+      });
+    })
+    */
+
+  });
+
+
+  describe('#handleOPTIONS', function(){
+    // TODO
+    it ("sends OPTIONS,POST,PUT when those methods are defined")
   });
 
 	describe('#getParentUrl', function(){

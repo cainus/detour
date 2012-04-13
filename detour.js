@@ -52,27 +52,6 @@ detour.prototype.getRouteTable = function(){
   return routes;
 }
 
-detour.prototype.setRoutes = function(app){
-	var setNodeRoutes = function(parentPath, node){
-		var path = urlJoin(parentPath, node.path) 
-		var methods = { "GET" : 'get',
-										"POST" : 'post',
-										"DELETE" : 'del',
-										"OPTIONS" : 'options',
-										"PUT" : 'put'}
-		_.each(methods, function(expressMethod, httpMethod){
-			if (!!node.module[httpMethod]){
-				app[expressMethod](path, node.module[httpMethod]);
-				app[expressMethod](path + '/', node.module[httpMethod]);
-			}
-		});
-    _.each(node.children, function(node){
-      setNodeRoutes(path, node);
-    })
-  }
-  setNodeRoutes(this.mountPath, this.rootResource)
-}
-
 detour.prototype.dispatch = function(req, res){
   var method = req.method
   var moduleMethod = method;
@@ -110,10 +89,11 @@ detour.prototype.dispatch = function(req, res){
         if (isCollection){
           newModuleMethod = "collectionGET";
         }
-        var origSend = res.send;
+        res.origSend = res.send;
         res.send = function(code, body){
-          if (!body){body = code; code = 200;}
-          origSend(code)
+          if (!body){body = '';}
+          code = 204;
+          res.origSend(code, '')
         }
         return resource.module[newModuleMethod](req, res)
       default :
@@ -142,7 +122,7 @@ detour.prototype.handle501 = function(req, res){
 detour.prototype.handleOPTIONS = function(req, res){
   // TODO return the right methods for all resource types.
   res.header('Allow', 'OPTIONS,POST')
-  res.send(200)
+  res.send(204)
 }
 
 
