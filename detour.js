@@ -10,6 +10,10 @@ function detour(mountPath, module){
 	this.mountPath = urlJoin('/', mountPath);
   this.rootResource = new ResourceTree('/', {})
   this.rootResource.module = module
+  this.serverSupportedMethods = ["GET", "POST", 
+                                  "PUT", "DELETE",
+                                  "HEAD", "OPTIONS"]  
+  // TODO: above list could be generated when the route table is.
 }
 
 detour.prototype.isCollection = function(node){
@@ -71,12 +75,15 @@ detour.prototype.setRoutes = function(app){
 
 detour.prototype.dispatch = function(req, res){
   var method = req.method
+  var moduleMethod = method;
+  if (!_.include(this.serverSupportedMethods, method)){
+    return this.handle501(req, res)
+  }
   if (req.url.length > 4096){
     return this.handle415(req, res)
   }
   try {
     var route = this.requestUrlToRoute(req.url)
-    var resource = route.resource;
   } catch (ex) {
     if (ex == "No matching route found."){
       return this.handle404(req, res)
@@ -84,10 +91,36 @@ detour.prototype.dispatch = function(req, res){
       throw ex;
     }
   }
-  if (!resource.module[method]){
-    return this.handle405(req, res)
+  var resource = route.resource;
+  var pathEndsWith = function(fullPath, subPath){
+    var retval = !!fullPath.match(new RegExp(subPath + "[\/]?$"));
+    return retval;
   }
-  resource.module[method](req, res)
+  var isCollection = !!this.isCollection(route.resource) && 
+                          pathEndsWith(req.url, route.url)
+  if (isCollection){
+    moduleMethod = "collection" + method;
+  }
+  if (!resource.module[moduleMethod]){
+    switch(method){
+      case "OPTIONS":
+        return this.handleOPTIONS(req, res)
+      case "HEAD":
+        var newModuleMethod = "GET";
+        if (isCollection){
+          newModuleMethod = "collectionGET";
+        }
+        var origSend = res.send;
+        res.send = function(code, body){
+          if (!body){body = code; code = 200;}
+          origSend(code)
+        }
+        return resource.module[newModuleMethod](req, res)
+      default :
+        return this.handle405(req, res)
+    }
+  }
+  resource.module[moduleMethod](req, res)
 }
 
 detour.prototype.handle415 = function(req, res){
@@ -102,9 +135,15 @@ detour.prototype.handle405 = function(req, res){
   res.send(405)
 }
 
-//detour.prototype.handleOPTIONS = function(req, res){
-//
-//}
+detour.prototype.handle501 = function(req, res){
+  res.send(501)
+}
+
+detour.prototype.handleOPTIONS = function(req, res){
+  // TODO return the right methods for all resource types.
+  res.header('Allow', 'OPTIONS,POST')
+  res.send(200)
+}
 
 
 // TODO make sure trailing slashes don't affect this
@@ -114,7 +153,7 @@ detour.prototype.addRoute = function(path, module){
                     "collectionGET", "collectionPOST",
                     "collectionPUT", "collectionDELETE"]
   if (!this._implementsMethods({module: module}, allMethods)){
-    throw 'The handler you tried to add for path /api/x has not valid HTTP methods.'
+    throw 'The handler you tried to add for path /api/x has no valid HTTP methods.'
   };
   var pieces = path.split('/');
   var kidName = pieces.pop()

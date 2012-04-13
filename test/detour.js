@@ -29,8 +29,9 @@ TODOS:
 - support sub resources of collections
 - got to capture variables in the url and set params[]
 - getUrl should take an options hash of variables to interpolate
+- handleOPTIONS needs direct tests because it just barely covers what's necessary
 - support OPTIONS
-- support TRACE
+x support TRACE (nope)
 - test with real app!
 - does it work on plain express?
 - does it work on plain connect?
@@ -45,6 +46,9 @@ TODOS:
 - what about the HEAD method?
 - programmatic routes?
 - ?? how to do route-specific middleware like authorization?
+- don't allow status codes to be invalid ones.  does express do this for us 
+- is there a way for routes to use a return instead of res.send() ??
+though?
 x getRoute(url) returns the route node for that url
 x getURL(routenode) returns the url for a given routenode
 x detour should have a method for applying routes, so that they're not
@@ -54,7 +58,19 @@ x support collections
 x have defaults for 404, 405, 414
 
 // NOTE: express 3.0 seems to be necessary for HEAD method support
-
+//
+TODO test what happens if there's an exception in the handler.  500?
+have to do?  catch any exceptions in handler and 500.
+look at express code for setting params.
+VERSION 2: redirects in the router
+VERSION 2: conditional GET, e-tags, caching, 304
+VERSION 2: cache recent urls / route combinations instead of requiring
+regex lookup?
+VERSION 2: routes that have no dynamic elements should be a simple
+object key lookup (no regex)
+VERSION 2: use 'moved permanently' (301) for case sensitivity problems
+in urls.  this is better for SEO
+VERSION 2: unicode route support ( see https://github.com/ckknight/escort )
 */
 
 var express = require('express');
@@ -144,13 +160,6 @@ describe('detour', function(){
       routes[1].url.should.equal("/api/other")
       routes[2].url.should.equal("/api/other/:other_id")
     })
-    it ("sets a default OPTIONS handler on every resource", function(){
-			var d = new detour('api', this.simpleModule)
-      
-      //res.header('Allow', 'OPTIONS,POST')
-      // TODO
-      
-    })
   });
 
   describe('#addRoute', function(){
@@ -169,7 +178,7 @@ describe('detour', function(){
         d.addRoute('/api/x', {})
         should.fail("expected exception was not thrown");
       } catch (ex ){
-        ex.should.equal('The handler you tried to add for path /api/x has not valid HTTP methods.')
+        ex.should.equal('The handler you tried to add for path /api/x has no valid HTTP methods.')
       }
     });
     it ("can add a route to the root path", function(){
@@ -273,6 +282,7 @@ describe('detour', function(){
 
 
 	describe('#getUrl', function(){
+    // TODO needs to handle urls with variables!
     it ("returns the url for a root node with an empty mountPath as /", function(){
 			var d = new detour('', this.simpleModule)
       d.getUrl(d.rootResource).should.equal("/");
@@ -378,6 +388,98 @@ describe('detour', function(){
 
 
   describe('#dispatch', function(){
+
+/*
+
+    // exception in handler leads to a 500
+    it ("responds with 500 if the handler throws an exception", function(){
+      var d = new detour('api', this.simpleModule);
+      // TODO this should be an express/hottap test
+    })
+*/
+    // HEAD is the same as GET, but without a response body
+    // It should call resource's GET or collectionGET, strip the body, and
+    // return the rest.  this may require redefining res.send() for GET and
+    // collectionGET methods
+    it ("HEAD on simple resources calls GET, but does not have a body",
+        function(){
+            var d = new detour('api', this.simpleModule);
+            var status = '';
+            var req = { method : "HEAD", url : "http://localhost:9999/api"}
+            var res = {send : function(code, body){ status = code;
+            should.not.exist(body)}}
+            d.dispatch(req, res);
+            status.should.equal(200)
+    })
+    it ("HEAD calls GET with a status code, but does not have a body",
+        function(){
+            var module = {
+              GET : function(req, res){
+                res.send(200, "cool");
+              }
+            }
+            var d = new detour('api', module);
+            var status = '';
+            var req = { method : "HEAD", url : "http://localhost:9999/api"}
+            var res = {send : function(code, body){ status = code;
+            should.not.exist(body)}}
+            d.dispatch(req, res);
+            status.should.equal(200)
+    })
+
+    it ("HEAD on collections calls collectionGET, but has no body", function(){
+      var d = new detour('api', this.simpleCollectionModule);
+      var status = '';
+      var req = { method : "HEAD", url : "http://localhost:9999/api"}
+      var res = {send : function(code, body){ status = code;
+                              should.not.exist(body)
+                        }
+                }
+      d.dispatch(req, res);
+      status.should.equal(200)
+    })
+
+
+    it ("HEAD on invalid paths 404s", function(){
+      var d = new detour('api', this.simpleModule);
+      var status = '';
+      var req = { method : "HEAD", url : "http://localhost:9999/api/x/y/z"}
+      var res = {send : function(code, body){ status = code;
+      should.not.exist(body)}}
+      d.dispatch(req, res);
+      status.should.equal(404)
+    })
+
+
+    // 501 not implemented -- when the server does not support the http
+    // method requested on ANY resources
+    it ("responds with 501 if the server doesn't support the method at all", 
+        function(){
+          var d = new detour('api', this.simpleModule);
+          var status = '';
+          var req = { method : "WTH", url : "http://localhost:9999/api"}
+          var res = {send : function(code, body){ 
+                                status = code; ;
+                                should.not.exist(body); }}
+          d.dispatch(req, res);
+          status.should.equal(501)
+    })
+
+    // TRACE disabled by default due to security concerns
+    // http://en.wikipedia.org/wiki/Cross-site_tracing
+    it ("responds with 501 if the method is TRACE", function(){
+      var d = new detour('api', this.simpleModule);
+      var status = '';
+      var req = { method : "TRACE", url : "http://localhost:9999/api"}
+      var res = {send : function(code, body){ 
+                          status = code;
+                          should.not.exist(body)
+                        }
+                }
+      d.dispatch(req, res);
+      status.should.equal(501)
+    })
+
     it ("finds and runs a GET handler at the root path", function(){
 			var d = new detour('', this.simpleModule)
       var response = "";
@@ -395,16 +497,36 @@ describe('detour', function(){
       var req = { method : "POST", url : 'http://localhost:9999/'}
       d.dispatch(req, res) 
       response.should.equal("OK!")
-    });/*
+    });
     it ("runs a default OPTIONS handler at the root path when one doesn't exist", function(){
 			var d = new detour('', this.simpleModule)
       var response = "";
+      var headerkey = '';
+      var headervalue = '';
 			d.rootResource.module = {POST : function(req, res){res.send("OK!")}}
-      var res = {send : function(str){ response = str;}}
+      var res = { send : function(str){ response = str;},
+                  header : function(k, v){headerkey = k; headervalue = v;}}
       var req = { method : "OPTIONS", url : 'http://localhost:9999/'}
       d.dispatch(req, res)
-      response.should.equal("")
-    });*/
+      response.should.equal(200)
+      headerkey.should.equal('Allow')
+      headervalue.should.equal('OPTIONS,POST')
+    });
+    it ("runs a default OPTIONS handler at a sub path when one doesn't exist", function(){
+			var d = new detour('', this.simpleModule)
+      var response = "NOT THIS";
+      var headerkey = "unset";
+      var headervalue = "unset";
+			d.addRoute('subby', {POST : function(req, res){res.send("OK!")}})
+      var res = {
+                 send : function(str){ response = str;}, 
+                 header : function(k,v){ headerkey = k;  headervalue = v;}}
+      var req = { method : "OPTIONS", url : 'http://localhost:9999/subby'}
+      d.dispatch(req, res)
+      response.should.equal(200)
+      headerkey.should.equal('Allow')
+      headervalue.should.equal('OPTIONS,POST')
+    });
     it ("finds and runs a GET handler at a sub path", function(){
 			var d = new detour('', this.simpleModule)
       var response = "";
@@ -412,46 +534,15 @@ describe('detour', function(){
 			d.rootResource.addChild('other', 
 															{GET : function(req, res){res.send("OK 2 !")}});
       var res = {send : function(str){ response = str;}}
-      var req = { method : "GET", url : 'http://localhost:9999/other'}
+      var req = { method : "GET", 
+                  url : 'http://localhost:9999/other'}
       d.dispatch(req, res) 
       response.should.equal("OK 2 !")
 
     });
-    it ("404s when it's passed a bad path", function(){
-			var d = new detour('', this.simpleModule)
-      var response = "NOT OK";
-      var status = 200
-      var req = { method : "GET", url : 'http://localhost:9999/doesNotExist'}
-      var res = {send : function(code, body){ response = body; status = code;}}
-      d.dispatch(req, res)
-      should.not.exist(response)
-      status.should.equal(404)
-    });
-    it ("405s when the method doesn't exist", function(){
-			var d = new detour('', this.simpleModule)
-      var response = "NOT OK";
-      var status = 200
-      var req = { method : "PUT", url : 'http://localhost:9999/'}
-      var res = {send : function(code, body){ response = body; status = code;}}
-      d.dispatch(req, res)
-      should.not.exist(response)
-      status.should.equal(405)
-    });
-    it('414s when uri is too long', function(){
-      var url = 'http://localhost:9999/';
-      for(var i = 0; i < 500; i++){
-        url += '1234567890';
-      }
-			var d = new detour('', this.simpleModule)
-      var response = "NOT OK";
-      var status = 200
-      var req = { method : "GET", url : url}
-      var res = {send : function(code, body){ response = body; status = code;}}
-      d.dispatch(req, res)
-      should.not.exist(response)
-      status.should.equal(414)
-    });
-    it ("finds and runs a GET handler on a member of a collection", function(){
+    it ("finds and runs a GET handler on a collection itself", function(){
+      // TODO!!
+      // good test, doesn't pass
 			var d = new detour('', this.simpleModule)
       var response = "";
 			d.rootResource.addChild('other', 
@@ -459,9 +550,9 @@ describe('detour', function(){
                                collectionGET : function(req, res){res.send("collection OK!")}}
                              );
       var res = {send : function(str){ response = str;}}
-      var req = { method : "GET", url : 'http://localhost:9999/other/1234'}
+      var req = { method : "GET", url : 'http://localhost:9999/other/'}
       d.dispatch(req, res) 
-      response.should.equal('OK 2 !')
+      response.should.equal('collection OK!')
     });
   });
 
