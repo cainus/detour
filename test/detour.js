@@ -59,12 +59,14 @@ x support TRACE (nope)
 x what about the HEAD method?
 
 VERSION 2:
+- do I really need all this gnarly tree stuff?  won't string ops on the
+path be good enough?
 - get it to work on connect?
 - save getRouteTable() for dispatch()s repeated use
 - redirects in the router
 - conditional GET, e-tags, caching, 304
 - cache recent urls / route combinations instead of requiring
-regex lookup?
+regex lookup?  -- perfect for memoization
 - routes that have no dynamic elements should be a simple
 object key lookup (no regex)
 - use 'moved permanently' (301) for case sensitivity problems
@@ -207,7 +209,7 @@ describe('detour', function(){
   });
 
 	describe('#getUrl', function(){
-    // TODO needs to handle urls with variables!
+
     it ("returns the url for a root node with an empty mountPath as /", function(){
 			var d = new detour('', this.simpleModule)
       d.getUrl(d.rootResource).should.equal("/");
@@ -222,6 +224,21 @@ describe('detour', function(){
 															{GET : function(req, res){res.send("OK 2 !")}});
       d.getUrl(d.rootResource.children[0]).should.equal("/api/other");
     });
+
+    it ("returns the url for a collection", function(){
+			var d = new detour('api', this.simpleCollectionModule)
+      d.getUrl(d.rootResource).should.equal("/api");
+    })
+    it ("returns the url for a collection member", function(){
+			var d = new detour('api', this.simpleCollectionModule)
+      var url = d.getUrl(d.rootResource, 1234)
+      url.should.equal('/api/1234')
+    })
+    it ("returns the url for a collection subresource", function(){
+        var d = new detour('api', this.simpleCollectionModule)
+        d.addRoute('/api/:api_id/asdf', this.simpleModule)
+        d.getUrl(d.rootResource.children[0], 1234).should.equal("/api/1234/asdf");
+    })
 
   })
 

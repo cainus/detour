@@ -152,14 +152,41 @@ detour.prototype.addRoute = function(path, module){
 }
 
 
-detour.prototype.getUrl = function(node){
+detour.prototype.getUrl = function(){
+  var args = _.toArray(arguments);
+  var node = args[0];
+  var vars = _.rest(args);
+  var that = this;
+
   var getAncestry = function(node){
     if (!node.parentNode){
-      return [];
+      return [node];  // terminate recursion at root
     }
-    return [getAncestry(node.parentNode), node.path]
+    return [getAncestry(node.parentNode), node]
   }
-  var pieces = _.flatten(getAncestry(node));
+  var nodes = _.flatten(getAncestry(node));
+  var collectionCount = 0;
+  _.each(nodes, function(node){
+    if (that.isCollection(node)){
+      collectionCount++;
+    }
+  })
+  var allowedCounts = [vars.length, vars.length + 1]
+  if (!_.include(allowedCounts, collectionCount)){
+    throw "getUrl requires " + allowedCounts.join(" or ") + " variables."
+  }
+  var pieces = [];
+  for(var i = 0; i < nodes.length; i++){
+    var node = nodes[i];
+    if (that.isCollection(node)){
+      pieces.push(node.path)
+      if (vars.length > 0){
+        pieces.push(vars.shift())
+      }
+    } else {
+      pieces.push(node.path)
+    }
+  }
   var url = urlJoin(this.mountPath, pieces);
   return url;
 }
