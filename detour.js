@@ -16,7 +16,7 @@ function detour(mountPath, module){
   // TODO: above list could be generated when the route table is.
 }
 
-detour.prototype.isCollection = function(node){
+detour.prototype.isCollectionRoute = function(node){
     return this._implementsMethods(node, ['collectionGET',
                                       'collectionPOST',
                                       'collectionPUT',
@@ -36,7 +36,7 @@ detour.prototype.getRouteTable = function(){
 
 	var getNodeRoutes = function(parentPath, node){
 		var path = urlJoin(parentPath, node.path) 
-    if (that.isCollection(node)){
+    if (that.isCollectionRoute(node)){
         routes.push({ url : path, resource : node})
         var id_name = ':' + node.path.replace(/\//, '') + '_id'
         path = urlJoin(path, id_name)
@@ -75,7 +75,7 @@ detour.prototype.dispatch = function(req, res){
     var retval = !!fullPath.match(new RegExp(subPath + "[\/]?$"));
     return retval;
   }
-  var isCollection = !!this.isCollection(route.resource) && 
+  var isCollection = !!this.isCollectionRoute(route.resource) && 
                           pathEndsWith(req.url, route.url)
   if (isCollection){
     moduleMethod = "collection" + method;
@@ -119,9 +119,45 @@ detour.prototype.handle501 = function(req, res){
   res.send(501)
 }
 
+detour.prototype.isCollection = function(url, route){
+  var pathEndsWith = function(fullPath, subPath){
+    var retval = !!fullPath.match(new RegExp(subPath + "[\/]?$"));
+    return retval;
+  }
+  var retval = !!this.isCollectionRoute(route.resource) && 
+                          pathEndsWith(url, route.url)
+  return retval;
+  
+}
+
+detour.prototype.getMethods = function(route){
+  var moduleMethods = _.keys(route.resource.module);
+  var retval = _.intersection(moduleMethods, this.serverSupportedMethods);
+  return retval
+}
+
+detour.prototype.getCollectionMethods = function(route){
+  var moduleMethods = _.keys(route.resource.module);
+  var httpMethods = []
+  _.each(moduleMethods, function(method){
+    if (!!method.match(/^collection/)){
+      httpMethods.push(method.substring('collection'.length))
+    }
+  });
+  var retval = _.intersection(httpMethods, this.serverSupportedMethods);
+  return retval
+}
+
 detour.prototype.handleOPTIONS = function(req, res){
-  // TODO return the right methods for all resource types.
-  res.header('Allow', 'OPTIONS,POST')
+  // TODO how to handle HEAD here
+  var route = this.requestUrlToRoute(req.url);
+  if (this.isCollection(req.url, route)){
+    var methods = this.getCollectionMethods(route)
+  } else {
+    var methods = this.getMethods(route)
+  }
+  methods = _.union(["OPTIONS"], methods);
+  res.header('Allow', methods.join(","))
   res.send(204)
 }
 
@@ -167,7 +203,7 @@ detour.prototype.getUrl = function(){
   var nodes = _.flatten(getAncestry(node));
   var collectionCount = 0;
   _.each(nodes, function(node){
-    if (that.isCollection(node)){
+    if (that.isCollectionRoute(node)){
       collectionCount++;
     }
   })
@@ -178,7 +214,7 @@ detour.prototype.getUrl = function(){
   var pieces = [];
   for(var i = 0; i < nodes.length; i++){
     var node = nodes[i];
-    if (that.isCollection(node)){
+    if (that.isCollectionRoute(node)){
       pieces.push(node.path)
       if (vars.length > 0){
         pieces.push(vars.shift())
@@ -241,7 +277,7 @@ detour.prototype.traversePaths = function(node, paths){
 
     var path = paths[0];
     paths = _.rest(paths);
-    if (this.isCollection(node)){
+    if (this.isCollectionRoute(node)){
       // skip one piece if it's a collection.
       if (paths.length == 0){
         return node;

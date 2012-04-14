@@ -30,21 +30,20 @@ TODOS:
 a pain for passing on headers correctly.
 - support sub resources of collections
 - got to capture variables in the url and set params[]
-- getUrl should take an options hash of variables to interpolate
-- handleOPTIONS needs direct tests because it just barely covers what's necessary
-- support OPTIONS
 - test with real app!
 - does it work on plain express?
 - does it work with filesystem tree?
-- preliminary documentation
+- preliminary examples in the docs
 - getChildUrls(node) returns the urls of the kids of a given node
-- support adding routes on-the-fly
-- custom handlers for 404, 405, 414 (request uri is too long) 
+- custom handlers for 404, 405, 414  (or just docs about monkey-patching)
 - programmatic routes?
 - ?? how to do route-specific middleware like authorization?
 - don't allow status codes to be invalid ones.  does express do this for us?
 - is there a way for routes to use a return instead of res.send() ??
 though?
+x handleOPTIONS needs direct tests because it just barely covers what's necessary
+x support OPTIONS
+x getUrl should take an array of variables to interpolate
 x test what happens if there's an exception in the handler.  500?
 x get rid of setRoutes?
 x 503, 501 handlers (not doing 503 'service unavailable')
@@ -57,6 +56,7 @@ x support collections
 x have defaults for 404, 405, 414
 x support TRACE (nope)
 x what about the HEAD method?
+x support adding routes on-the-fly
 
 VERSION 2:
 - do I really need all this gnarly tree stuff?  won't string ops on the
@@ -588,15 +588,48 @@ describe('detour', function(){
 
 
   describe('#handleOPTIONS', function(){
-    // TODO
-    it ("sends OPTIONS,POST,PUT when those methods are defined")
+    it ("sends OPTIONS,POST,PUT when those methods are defined", function(){
+      var d = new detour('', {
+                              POST : function(req, res){}, 
+                              PUT : function(req, res){}
+                             }
+                        );
+      var response = "";
+      var headerkey = '';
+      var headervalue = '';
+      var res = { send : function(str){ response = str;},
+                  header : function(k, v){headerkey = k; headervalue = v;}}
+      var req = { method : "OPTIONS", url : 'http://localhost:9999/'}
+      d.dispatch(req, res)
+      response.should.equal(204)
+      headerkey.should.equal('Allow')
+      headervalue.should.equal('OPTIONS,POST,PUT')
+      
+    })
+    it ("sends OPTIONS,GET,POST on a collection when those methods are defined", function(){
+      var d = new detour('', {
+                              collectionPOST : function(req, res){}, 
+                              collectionGET : function(req, res){}
+                             }
+                        );
+      var response = "";
+      var headerkey = '';
+      var headervalue = '';
+      var res = { send : function(str){ response = str;},
+                  header : function(k, v){headerkey = k; headervalue = v;}}
+      var req = { method : "OPTIONS", url : 'http://localhost:9999/'}
+      d.dispatch(req, res)
+      response.should.equal(204)
+      headerkey.should.equal('Allow')
+      headervalue.should.equal('OPTIONS,POST,GET')
+    
+    })
   });
 
 	describe('#getParentUrl', function(){
     it ("throws an exception when getting the parent url of a root node", function(){
 			var d = new detour('', this.simpleModule)
       try {
-        console.log(d.getParentUrl(d.rootResource))
         d.getParentUrl(d.rootResource).should.equal("/");
         should.fail("unexpected exception was thrown")
       } catch (ex) {
