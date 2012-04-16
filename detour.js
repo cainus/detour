@@ -10,6 +10,14 @@ function detour(){
   // TODO: above list could be generated when the route table is.
   this.routes = {}
   this.starRoutes = []
+  this.names = []
+  this.requestNamespace = 'detour'  // req.detour will have this object
+
+  var that = this;
+  this.middleware = function(req, res, next){
+    that.dispatch(req, res, next);
+  }
+
 }
 
 detour.prototype._path = function(urlstr){
@@ -32,7 +40,26 @@ detour.prototype.getHandler = function(url){
   throw error('NotFound', 'That route is unknown.', "" + url)
 }
 
+detour.prototype._getInputPath = function(url){
+  var path = this._path(url)
+  if (!!this.routes[path] && !!this.routes[path].handler){
+    return path;
+  }
+  // check the starRoutes if it's not static...
+  var route = _.find(this.starRoutes, function(route){
+    return !!path.match(route.regex)
+  })
+  if (!!route && !!route.handler){
+    return route.path;
+  }
+
+  throw error('NotFound', 'That route is unknown.', "" + url)
+}
+
+
 detour.prototype.dispatch = function(req, res, next){
+  req[this.requestNamespace] = this;
+
   if (req.url.length > 4096){
     return this.handle414(req, res)
   }
@@ -56,28 +83,15 @@ detour.prototype.dispatch = function(req, res, next){
   if (!handler[method]){
     switch(method){
       case "OPTIONS" : return this.handleOPTIONS(req, res);
+      case "HEAD" : return this.handleHEAD(req, res);
       default : return this.handle405(req, res)
     }
   }
 
   return handler[method](req, res)
 
-  // old stuff below here
-  /*
-      case "HEAD":
-        var newModuleMethod = "GET";
-        if (isCollection){
-          newModuleMethod = "collectionGET";
-        }
-        res.origSend = res.send;
-        res.send = function(code, body){
-          if (!body){body = '';}
-          code = 204;
-          res.origSend(code, '')
-        }
-    }
-    */
 }
+
 
 error = function(type, message, detail){
   message = message || ''
@@ -193,6 +207,33 @@ detour.prototype.handleOPTIONS = function(req, res){
   res.send(204)
 }
 
+
+detour.prototype.name = function(path, name){
+
+  try {
+    var path = this._getInputPath(path);
+  } catch(ex) {
+    if (ex.type == "NotFound"){
+    throw error("PathDoesNotExist", 
+                "Cannot name a path that doesn't exist",
+               "/")
+    }
+    throw ex;
+  }
+  this.names[name] = path;
+}
+
+detour.prototype.handleHEAD = function(req, res){
+  var handler = this.getHandler(req.url);
+  res.origSend = res.send;
+  res.send = function(){
+    res.origSend()
+  }
+  if (!handler.GET){
+    return this.handle405(req, res)
+  }
+  handler.GET(req, res);
+}
 
 exports.detour = detour
 

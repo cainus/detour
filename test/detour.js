@@ -29,50 +29,58 @@ handled automatically.  Only necessary for dynamic routes.
 * we want /asdf/1234/qwer/2345 to 404 if /asdf/1234 is a 404.
 
 TODOS:
-- might be better to rely on express' HEAD implementation.  the current one is 
-a pain for passing on headers correctly.
-- support sub resources of collections
-- got to capture variables in the url and set params[]
+- d.parentUrl(some url or name)
+- d.childUrls(some url or name)
+- d.shouldAllowSparseRoutes = true; // default is false. true = throw exceptions
+- d.resources.blank()  // GET only, 204, empty doc.
+- d.resources.empty()  // 404
+- getChildUrls(path) returns the urls of the kids of a given node
+- preliminary examples in the docs
+- implement fetch() we want /asdf/1234/qwer/2345 to 404 if /asdf/1234 is a 404.
+
+=== refactor ===
+- hide private methods entirely
+
+=== test ===
 - test with real app!
 - does it work on plain express?
-- does it work with filesystem tree?
-- preliminary examples in the docs
-- getChildUrls(path) returns the urls of the kids of a given node
-- programmatic routes?
-- ?? how to do route-specific middleware like authorization?
-- don't allow status codes to be invalid ones.  does express do this for us?
-- getUrl should take an object / array of variables to interpolate
 - test what happens if there's an exception in the handler.  500?
-- what about the HEAD method?
-- implement fetch() we want /asdf/1234/qwer/2345 to 404 if /asdf/1234 is a 404.
-- d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
-- make star routes set req.pathVariables
-- make getUrl set path variables in starRoutes
-- handle all methods and 405s
-- handle named routes
-- HEAD
+
+=== fs ===
 - make route('/asdf', './somemodule') do a require('./somemodule') 
+- d.fromFileSystem('./some dir') // https://github.com/coolaj86/node-walk#readme walkSync
+- d.resources.file(filename) // GET only, 200, sendFile
+- does it work with filesystem tree?
+
+=== middleware ===
+- ?? how to do route-specific middleware like authorization?
 - add middleware to route()
 - add middleware to dispatch()
 - d.addMiddleware(paths_array, [middlewarez])
 - d.addMiddlewareExcept(paths_array, [middlewarez])
+- d.routes({'/this/is/the/path' : handler, '/this/is/the/path' : handler}, [middlewarezz])
+
+=== star routes ===
+- support sub resources of collections
+- d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
+- getUrl should take an object / array of variables to interpolate
+- make star routes set req.pathVariables
+- make getUrl set path variables in starRoutes
+- got to capture variables in the url and set params[]
+- d.url('/this/is/the/path/*varname/sub', {varname : 1234})
+
+=== names ===
 - make named routes work -- route('/asdf', module).as('asdf')
 - urls must start with /.  Names cannot contain /
-- d.name('/this/is/the/path', name)  // set
-- d.name('/this/is/the/path')  // get
-- d.parentUrl(some url or name)
-- d.childUrls(some url or name)
-- d.shouldAllowSparseRoutes = true; // default is false. true = throw exceptions
-- d.requestNamespace = "detour" // req.detour will be the detour object
-- d.routes({'/this/is/the/path' : handler, '/this/is/the/path' : handler}, [middlewarezz])
-- d.url('/this/is/the/path/*varname/sub', {varname : 1234})
+- handle named routes
 - d.url("some_name", {varname : 1234})
-- d.fromFileSystem('./some dir') // https://github.com/coolaj86/node-walk#readme walkSync
-- d.blankResource()  // GET only, 200, empty doc.
-- d.emptyResource()  // 404
-- d.fileResource(filename) // GET only, 200, sendFile
-- detour.router returns a function that calls dispatch:  app.use(d.router);
-- 
+
+
+x detour.router returns a function that calls dispatch:  app.use(d.router);
+x d.requestNamespace = "detour" // req.detour will be the detour object
+x d.name('/this/is/the/path', name)  // set
+x HEAD
+x handle all methods and 405s
 
 three new recognized methods of a resource:
     beforeMethods : function(req, res, next){
@@ -97,6 +105,7 @@ three new recognized methods of a resource:
 
 
 VERSION 2:
+- programmatic routes?  sub-routers?
 - PATCH?
 - get it to work on connect?
 - redirects in the router
@@ -107,6 +116,7 @@ regex lookup?  -- perfect for memoization
 in urls.  this is better for SEO
 - unicode route support ( see https://github.com/ckknight/escort )
 - server could note what's acceptable on all routes and check 406. have to do?
+- don't allow status codes to be invalid ones.  does express do this for us?
 
 // NOTE: express 3.0 seems to be necessary for HEAD method support
 */
@@ -171,6 +181,21 @@ describe('detour', function(){
       // do nothing. assumed already closed.
     }
 	})
+
+  describe('#name', function(){
+    it ("as a setter, it throws an exception if the path doesn't exist", function(){
+        var d = new detour()
+        expectException(function(){
+          d.name('/', 'root')
+        }, "PathDoesNotExist", "Cannot name a path that doesn't exist", "/")
+    })
+    it ("as a setter, it allows a path to be set if it exists", function(){
+        var d = new detour()
+        d.route('/', function(req, res){ res.send("hello world");});
+        d.name('/', 'root')
+    })
+  })
+
 
 	describe('#getHandler', function(){
     it ("when accessing an undefined url, throws an exception",
@@ -287,7 +312,40 @@ describe('detour', function(){
 
   })
 
+
+  describe('#middleware', function(){
+    it ("is function that plugs this into express in as middleware", function(){
+      var d = new detour()
+      var called = false;
+      d.dispatch = function(req, res, next){ called = true; }
+      d.middleware({}, {}, function(){});
+      called.should.equal(true);
+    
+    })//   app.use(d.middleware);
+  
+  });
+
   describe('#dispatch', function(){
+
+    it ("decorates every request object with the detour object as req.detour by default", 
+        function(){
+          var d = new detour()
+          d.route('/', { POST : function(req, res){return "POST";}});
+          var req = { url : "http://asdf.com/", method : "POST"}
+          d.dispatch(req, this.res)
+          should.exist(req.detour)
+        }
+    );
+    it ("decorates req with the detour object as req[d.requestNamespace]",
+        function(){
+          var d = new detour()
+          d.requestNamespace = "router"
+          d.route('/', { POST : function(req, res){return "POST";}});
+          var req = { url : "http://asdf.com/", method : "POST"}
+          d.dispatch(req, this.res)
+          should.exist(req.router)
+        }
+    );
 
     it ("404s when it doesn't find a matching route and shouldHandle404s is true", function(){
       var d = new detour()
@@ -353,17 +411,54 @@ describe('detour', function(){
       // TODO this should be an express/hottap test
     })
 */
-    // HEAD is the same as GET, but without a response body
-    // It should call resource's GET or collectionGET, strip the body, and
-    // return the rest.  this may require redefining res.send() for GET and
-    // collectionGET methods
-    it ("HEAD calls GET, but returnd 204 without a body",
-        function(){
-    })
 
-    it ("runs a default OPTIONS handler at the root path when one doesn't exist", function(){
+    describe("when the method is HEAD", function(){
+      // HEAD is the same as GET, but without a response body
+      // It should call resource's GET or collectionGET, strip the body, and
+      // return the rest.
+      it ("404s if the resource doesn't exist", function(){
+          var d = new detour()
+          var req = { url : "http://asdf.com/asdf", method : "OPTIONS"}
+          d.dispatch(req, this.res)
+          this.res.expectSend(404)
+      });
+      it ("405s if the resource has no GET", function(){
+          var d = new detour()
+          d.route('/', { POST : function(req, res){return "POST";}});
+          var req = { url : "http://asdf.com/", method : "HEAD"}
+          d.dispatch(req, this.res)
+          this.res.expectSend(405)
+      })
+      it ("204s (no body) if the resource has a GET", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.header("Content-Type", 'application/wth');
+                              res.send("GET output");
+                        }});
+          var req = { url : "http://asdf.com/", method : "HEAD"}
+          d.dispatch(req, this.res)
+          this.res.expectSend(204)
+          this.res.expectHeader("Content-Type", 'application/wth')
+      })
     });
-    it ("runs a default OPTIONS handler at a sub path when one doesn't exist", function(){
+
+    describe ("when the method is OPTIONS", function(){
+      it ("404s if the resource doesn't exist", function(){
+          var d = new detour()
+          var req = { url : "http://asdf.com/asdf", method : "OPTIONS"}
+          d.dispatch(req, this.res)
+          this.res.expectSend(404)
+      });
+      it ("sets the proper headers for OPTIONS if the resource exists", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.send("GET output");
+                        }});
+          var req = { url : "http://asdf.com/", method : "OPTIONS"}
+          d.dispatch(req, this.res)
+          this.res.expectSend(204)
+          this.res.expectHeader('Allow', 'OPTIONS,GET')
+      })
     });
     it ("finds and runs a GET handler at a sub path", function(){
     });
