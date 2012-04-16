@@ -62,18 +62,13 @@ TODOS:
 
 === star routes ===
 - support sub resources of collections
-- d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
+x d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
 - getUrl should take an object / array of variables to interpolate
 - make star routes set req.pathVariables
 - make getUrl set path variables in starRoutes
 - got to capture variables in the url and set params[]
 - d.url('/this/is/the/path/*varname/sub', {varname : 1234})
 
-=== names ===
-- make named routes work -- route('/asdf', module).as('asdf')
-- urls must start with /.  Names cannot contain /
-- handle named routes
-- d.url("some_name", {varname : 1234})
 
 
 x detour.router returns a function that calls dispatch:  app.use(d.router);
@@ -117,6 +112,11 @@ in urls.  this is better for SEO
 - unicode route support ( see https://github.com/ckknight/escort )
 - server could note what's acceptable on all routes and check 406. have to do?
 - don't allow status codes to be invalid ones.  does express do this for us?
+=== named routes ===
+- make named routes work -- route('/asdf', module).as('asdf')
+- urls must start with /.  Names cannot contain /
+- handle named routes
+- d.url("some_name", {varname : 1234})
 
 // NOTE: express 3.0 seems to be necessary for HEAD method support
 */
@@ -195,6 +195,33 @@ describe('detour', function(){
         d.name('/', 'root')
     })
   })
+
+  describe('#pathVariables', function(){
+    it ('returns an empty hash for a static route', function(){
+      // d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
+      var d = new detour()
+      d.route('/', function(req, res){ res.send("hello world");});
+      _.keys(d.pathVariables('http://asdf.com/')).length.should.equal(0)
+    })
+    it ("throws an exception when the url doesn't route", function(){
+      var d = new detour()
+      expectException(function(){
+        d.pathVariables('http://asdf.com/')
+      }, "NotFound", 'That route is unknown.', '/')
+    })
+    it ('returns a hash of vars for a star route', function(){
+      // d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
+      var d = new detour()
+      d.route('/', function(req, res){ res.send("hello world");});
+      d.route('/*onetwothreefour', function(req, res){ res.send("hello world");});
+      d.route('/*onetwothreefour/asdf', function(req, res){ res.send("hello world");});
+      d.route('/*onetwothreefour/asdf/*fourfivesixseven', function(req, res){ res.send("hello world");});
+      var vars = d.pathVariables('http://asdf.com/1234/asdf/4567')
+      _.keys(vars).length.should.equal(2)
+      vars['onetwothreefour'].should.equal('1234')
+      vars['fourfivesixseven'].should.equal('4567')
+    })
+  });
 
 
 	describe('#getHandler', function(){

@@ -37,7 +37,7 @@ detour.prototype.getHandler = function(url){
     return route.handler;
   }
 
-  throw error('NotFound', 'That route is unknown.', "" + url)
+  throw error('NotFound', 'That route is unknown.', "" + path)
 }
 
 detour.prototype._getInputPath = function(url){
@@ -53,9 +53,40 @@ detour.prototype._getInputPath = function(url){
     return route.path;
   }
 
-  throw error('NotFound', 'That route is unknown.', "" + url)
+  throw error('NotFound', 'That route is unknown.', "" + path)
 }
 
+detour.prototype._getUrlRoute = function(url){
+  var path = this._path(url)
+  if (!!this.routes[path] && !!this.routes[path].handler){
+    return {path : path, handler : this.routes[path].handler};
+  }
+  // check the starRoutes if it's not static...
+  var route = _.find(this.starRoutes, function(route){
+    return !!path.match(route.regex)
+  })
+  if (!!route && !!route.handler){
+    return route;
+  }
+
+  throw error('NotFound', 'That route is unknown.', "" + path)
+}
+
+detour.prototype.pathVariables = function(url){
+  var path = this._path(url)
+  var route = this._getUrlRoute(url);
+  if (!route.regex) {
+    return {};
+  }
+  var varnames = route.path.match(/\*([^/]+)/g)
+  varnames = _.map(varnames, function(name){return name.substring(1)})
+  var matches = path.match(route.regex)
+  var retval = {}
+  for (var i =0; i < varnames.length; i++){
+    retval[varnames[i]] = matches[i + 1]
+  }
+  return retval;
+}
 
 detour.prototype.dispatch = function(req, res, next){
   req[this.requestNamespace] = this;
@@ -137,10 +168,13 @@ detour.prototype._isStarPath = function(path){
 }
 
 detour.prototype._addStarRoute = function(path, route){
+  var escapeSlashes = function(str){
+    return;
+  };
   // change path to a regex
-  var reStr = "^" + path.replace(/\//g, '\\/') + "$"
+  var reStr = path.replace(/\//g, '\\/')
   // change *paths to a match non-slash
-  var reStr = reStr.replace(/\*[^/]+/, "[^/]+")
+  var reStr = "^" + reStr.replace(/\*[^/]+/g, "([^/]+)") + "$"
   var re = new RegExp(reStr);
   route.regex = re;
   route.path = path
@@ -164,7 +198,7 @@ detour.prototype.route = function(path, handler, maybe_middleware){
   }
 
   if (_.isFunction(handler)){
-    this.routes[path] = { handler : {GET : handler}}
+    var handler = {GET : handler}
   } else {
     if (!this._handlerHasHttpMethods(handler)){
       throw error(
@@ -173,11 +207,11 @@ detour.prototype.route = function(path, handler, maybe_middleware){
            ''
       )
     }
+  }
 
-    if (this._isStarPath(path)){
-      this._addStarRoute(path, { handler : handler})
-    }
-
+  if (this._isStarPath(path)){
+    this._addStarRoute(path, { handler : handler})
+  } else {
     this.routes[path] = { handler : handler}
   }
 
