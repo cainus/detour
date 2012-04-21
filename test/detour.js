@@ -139,10 +139,12 @@ describe('detour', function(){
   }
 
   var FakeRes = function(){
-    this.sendArgs = []
-    this.headers = {}
-    this.send =function(){ this.sendArgs = _.toArray(arguments) }
-    this.header = function(name, value){this.headers[name] = value;}
+    this.body = '';
+    this.headers = {};
+    this.status = 0;
+    this.end =function(data){ this.body = data || ''; }
+    this.writeHead = function(code){this.status = code;}
+    this.setHeader = function(name, value){this.headers[name] = value;}
     this.expectHeader = function(name, value){
       if (!this.headers[name]){
         should.fail("header " + name + " was not set.")
@@ -153,7 +155,10 @@ describe('detour', function(){
                     " but was " + this.headers[name] + ".")
       }
     }
-    this.expectSend = function() { 
+    this.expectStatus = function(status){
+      this.status.should.equal(status);
+    }
+    this.expectEnd = function() { 
       var args = _.toArray(arguments);
       var diff = _.difference(this.sendArgs, args)
       if (diff.length != 0){ 
@@ -249,7 +254,7 @@ describe('detour', function(){
         d.route('/', function(req, res){return "hello world";});
         var req = { url : "http://asdf.com/", method : "GET"}
         d.dispatch(req, this.res)
-        this.res.expectSend("hello world")
+        this.res.expectEnd("hello world")
 
     })
 
@@ -258,7 +263,7 @@ describe('detour', function(){
         d.route('/', { GET : function(req, res){return "hello world";}});
         var req = { url : "http://asdf.com/", method : "GET"}
         d.dispatch(req, this.res)
-        this.res.expectSend("hello world")
+        this.res.expectEnd("hello world")
     })
 
     it ("can route a module that it requires")
@@ -280,10 +285,10 @@ describe('detour', function(){
         var d = new detour()
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
-        d.route('/hello', { GET : function(req, res){res.send("hello world");}});
+        d.route('/hello', { GET : function(req, res){res.end("hello world");}});
         var req = { url : "http://asdf.com/hello", method : "GET"}
         d.dispatch(req, this.res)
-        this.res.expectSend("hello world")
+        this.res.expectEnd("hello world")
     });
 
     it ("can add a route to a non-root path that exists", function(){
@@ -291,10 +296,10 @@ describe('detour', function(){
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
         d.route('/hello/', { GET : function(req, res){res.send("hello world");}});
-        d.route('/hello/somenum', { GET : function(req, res){res.send("hello world 2");}});
+        d.route('/hello/somenum', { GET : function(req, res){res.end("hello world 2");}});
         var req = { url : "http://asdf.com/hello/somenum", method : "GET"}
         d.dispatch(req, this.res)
-        this.res.expectSend("hello world 2")
+        this.res.expectEnd("hello world 2")
     });
 
     it ("can add a wildcard route", function(){
@@ -302,10 +307,10 @@ describe('detour', function(){
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
         d.route('/hello/', { GET : function(req, res){res.send("hello world");}});
-        d.route('/hello/*somenum', { GET : function(req, res){res.send("hello world 2");}});
+        d.route('/hello/*somenum', { GET : function(req, res){res.end("hello world 2");}});
         var req = { url : "http://asdf.com/hello/1234", method : "GET"}
         d.dispatch(req, this.res)
-        this.res.expectSend("hello world 2")
+        this.res.expectEnd("hello world 2")
     });
 
     it ("throws an exception if the module doesn't implement any methods", function(){
@@ -340,15 +345,15 @@ describe('detour', function(){
   })
 
 
-  describe('#middleware', function(){
+  describe('#expressRoute', function(){
     it ("is function that plugs this into express in as middleware", function(){
       var d = new detour()
       var called = false;
       d.dispatch = function(req, res, next){ called = true; }
-      d.middleware({}, {}, function(){});
+      d.expressMiddleware({}, {}, function(){});
       called.should.equal(true);
     
-    })//   app.use(d.middleware);
+    })
   
   });
 
@@ -378,8 +383,8 @@ describe('detour', function(){
       var d = new detour()
       var req = {url : "http://asdf.com/", method : 'GET'}
       d.dispatch(req, this.res)
-      this.res.sendArgs[0].should.equal(404)
-      this.res.sendArgs.length.should.equal(1)
+      this.res.status.should.equal(404)
+      this.res.body.should.equal('')
     })
     it ("calls next() when it doesn't find a matching route and shouldHandle404s is false", function(){
       var d = new detour()
@@ -388,7 +393,8 @@ describe('detour', function(){
       var success = false;
       function next(){success = true;}
       d.dispatch(req, this.res, next)
-      this.res.sendArgs.length.should.equal(0)
+      this.res.body.should.equal('')
+      success.should.equal(true);
     })
 
     it ("414s if the url is too long", function(){
@@ -400,7 +406,7 @@ describe('detour', function(){
       d.route('/hello', { GET : function(req, res){res.send("hello world");}});
       var req = { url : bigurl, method : "PUT"}
       d.dispatch(req, this.res)
-      this.res.expectSend(414)
+      this.res.expectStatus(414)
     })
 
     it ("405s on a resource-unsupported method", function(){
@@ -410,7 +416,7 @@ describe('detour', function(){
       d.route('/hello', { GET : function(req, res){res.send("hello world");}});
       var req = { url : "http://asdf.com/hello", method : "PUT"}
       d.dispatch(req, this.res)
-      this.res.expectSend(405)
+      this.res.expectStatus(405)
     })
 
     it ("501s on a server-unsupported method", function(){
@@ -420,14 +426,14 @@ describe('detour', function(){
       d.route('/hello', { GET : function(req, res){res.send("hello world");}});
       var req = { url : "http://asdf.com/hello", method : "TRACE"}
       d.dispatch(req, this.res)
-      this.res.expectSend(501)
+      this.res.expectStatus(501)
     })
     it ("can route an object with a POST", function(){
         var d = new detour()
         d.route('/', { POST : function(req, res){return "POST";}});
         var req = { url : "http://asdf.com/", method : "POST"}
         d.dispatch(req, this.res)
-        this.res.expectSend("POST")
+        this.res.expectEnd("POST")
     })
 
 /*
@@ -447,24 +453,24 @@ describe('detour', function(){
           var d = new detour()
           var req = { url : "http://asdf.com/asdf", method : "OPTIONS"}
           d.dispatch(req, this.res)
-          this.res.expectSend(404)
+          this.res.expectStatus(404)
       });
       it ("405s if the resource has no GET", function(){
           var d = new detour()
           d.route('/', { POST : function(req, res){return "POST";}});
           var req = { url : "http://asdf.com/", method : "HEAD"}
           d.dispatch(req, this.res)
-          this.res.expectSend(405)
+          this.res.expectStatus(405)
       })
       it ("204s (no body) if the resource has a GET", function(){
           var d = new detour()
           d.route('/', { GET : function(req, res){
-                              res.header("Content-Type", 'application/wth');
-                              res.send("GET output");
+                              res.setHeader("Content-Type", 'application/wth');
+                              res.end("GET output");
                         }});
           var req = { url : "http://asdf.com/", method : "HEAD"}
           d.dispatch(req, this.res)
-          this.res.expectSend(204)
+          this.res.expectStatus(204)
           this.res.expectHeader("Content-Type", 'application/wth')
       })
     });
@@ -474,7 +480,7 @@ describe('detour', function(){
           var d = new detour()
           var req = { url : "http://asdf.com/asdf", method : "OPTIONS"}
           d.dispatch(req, this.res)
-          this.res.expectSend(404)
+          this.res.expectStatus(404)
       });
       it ("sets the proper headers for OPTIONS if the resource exists", function(){
           var d = new detour()
@@ -483,7 +489,7 @@ describe('detour', function(){
                         }});
           var req = { url : "http://asdf.com/", method : "OPTIONS"}
           d.dispatch(req, this.res)
-          this.res.expectSend(204)
+          this.res.expectStatus(204)
           this.res.expectHeader('Allow', 'OPTIONS,GET')
       })
     });
@@ -586,7 +592,7 @@ describe('detour', function(){
                         );
       var req = { method : "OPTIONS", url : 'http://localhost:9999/'}
       d.dispatch(req, this.res)
-      this.res.expectSend(204)
+      this.res.expectStatus(204)
       this.res.expectHeader('Allow', 'OPTIONS,POST,PUT')
     })
   });

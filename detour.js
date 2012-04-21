@@ -14,7 +14,7 @@ function detour(){
   this.requestNamespace = 'detour'  // req.detour will have this object
 
   var that = this;
-  this.middleware = function(req, res, next){
+  this.expressMiddleware = function(req, res, next){
     that.dispatch(req, res, next);
   }
 
@@ -218,27 +218,32 @@ detour.prototype.route = function(path, handler, maybe_middleware){
 }
 
 detour.prototype.handle414 = function(req, res){
-  res.send(414)
+  res.writeHead(414)
+  res.end()
 }
 
 detour.prototype.handle404 = function(req, res){
-  res.send(404)
+  res.writeHead(404)
+  res.end()
 }
 
 detour.prototype.handle405 = function(req, res){
-  res.send(405)
+  res.writeHead(405)
+  res.end()
 }
 
 detour.prototype.handle501 = function(req, res){
-  res.send(501)
+  res.writeHead(501)
+  res.end()
 }
 
 detour.prototype.handleOPTIONS = function(req, res){
   var handler = this.getHandler(req.url);
   var methods = this._getMethods(handler)
   methods = _.union(["OPTIONS"], methods);
-  res.header('Allow', methods.join(","))
-  res.send(204)
+  res.setHeader('Allow', methods.join(","))
+  res.writeHead(204)
+  res.end()
 }
 
 
@@ -259,13 +264,14 @@ detour.prototype.name = function(path, name){
 
 detour.prototype.handleHEAD = function(req, res){
   var handler = this.getHandler(req.url);
-  res.origSend = res.send;
-  res.send = function(){
-    res.origSend()
+  res.origEnd = res.end;
+  res.end = function(){
+    res.origEnd()
   }
   if (!handler.GET){
     return this.handle405(req, res)
   }
+  res.writeHead(204);
   handler.GET(req, res);
 }
 
