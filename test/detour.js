@@ -32,8 +32,6 @@ TODOS:
 - d.parentUrl(some url or name)
 - d.childUrls(some url or name)
 - d.shouldAllowSparseRoutes = true; // default is false. true = throw exceptions
-- d.resources.blank()  // GET only, 204, empty doc.
-- d.resources.empty()  // 404
 - getChildUrls(path) returns the urls of the kids of a given node
 - preliminary examples in the docs
 - implement fetch() we want /asdf/1234/qwer/2345 to 404 if /asdf/1234 is a 404.
@@ -43,14 +41,7 @@ TODOS:
 
 === test ===
 - test with real app!
-- does it work on plain express?
-- test what happens if there's an exception in the handler.  500?
 
-=== fs ===
-- make route('/asdf', './somemodule') do a require('./somemodule') 
-- d.fromFileSystem('./some dir') // https://github.com/coolaj86/node-walk#readme walkSync
-- d.resources.file(filename) // GET only, 200, sendFile
-- does it work with filesystem tree?
 
 === middleware ===
 - ?? how to do route-specific middleware like authorization?
@@ -69,6 +60,13 @@ x d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
 - got to capture variables in the url and set params[]
 - d.url('/this/is/the/path/*varname/sub', {varname : 1234})
 
+=== NOT for the router ===
+- d.resources.blank()  // GET only, 204, empty doc.
+- d.resources.empty()  // 404
+- make route('/asdf', './somemodule') do a require('./somemodule') 
+- d.fromFileSystem('./some dir') // https://github.com/coolaj86/node-walk#readme walkSync
+- d.resources.file(filename) // GET only, 200, sendFile
+- does it work with filesystem tree?
 
 
 x detour.router returns a function that calls dispatch:  app.use(d.router);
@@ -76,6 +74,8 @@ x d.requestNamespace = "detour" // req.detour will be the detour object
 x d.name('/this/is/the/path', name)  // set
 x HEAD
 x handle all methods and 405s
+x does it work on plain express?
+x test what happens if there's an exception in the handler.  500?
 
 three new recognized methods of a resource:
     beforeMethods : function(req, res, next){
@@ -100,9 +100,9 @@ three new recognized methods of a resource:
 
 
 VERSION 2:
+- is it faster to not use regex at all?
 - programmatic routes?  sub-routers?
 - PATCH?
-- get it to work on connect?
 - redirects in the router
 - conditional GET, e-tags, caching, 304
 - cache recent urls / route combinations instead of requiring
@@ -112,6 +112,7 @@ in urls.  this is better for SEO
 - unicode route support ( see https://github.com/ckknight/escort )
 - server could note what's acceptable on all routes and check 406. have to do?
 - don't allow status codes to be invalid ones.  does express do this for us?
+
 === named routes ===
 - make named routes work -- route('/asdf', module).as('asdf')
 - urls must start with /.  Names cannot contain /
@@ -417,6 +418,15 @@ describe('detour', function(){
       var req = { url : "http://asdf.com/hello", method : "PUT"}
       d.dispatch(req, this.res)
       this.res.expectStatus(405)
+    })
+    it ("500s on a directly thrown exception", function(){
+      var d = new detour()
+      var simpleModule = this.simpleModule;
+      d.route('/', simpleModule)
+      d.route('/fail', { GET : function(req, res){ throw 'wthizzle';}});
+      var req = { url : "http://asdf.com/fail", method : "GET"}
+      d.dispatch(req, this.res)
+      this.res.expectStatus(500)
     })
 
     it ("501s on a server-unsupported method", function(){

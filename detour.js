@@ -119,7 +119,11 @@ detour.prototype.dispatch = function(req, res, next){
     }
   }
 
-  return handler[method](req, res)
+  try {
+    return handler[method](req, res)
+  } catch(ex){
+    this.handle500(req, res, ex);
+  }
 
 }
 
@@ -234,6 +238,12 @@ detour.prototype.handle405 = function(req, res){
 
 detour.prototype.handle501 = function(req, res){
   res.writeHead(501)
+  res.end()
+}
+
+detour.prototype.handle500 = function(req, res, ex){
+  console.log(ex);
+  res.writeHead(500)
   res.end()
 }
 
