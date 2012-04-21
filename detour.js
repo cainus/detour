@@ -74,18 +74,23 @@ detour.prototype._getUrlRoute = function(url){
 
 detour.prototype.pathVariables = function(url){
   var path = this._path(url)
-  var route = this._getUrlRoute(url);
-  if (!route.regex) {
-    return {};
-  }
-  var varnames = route.path.match(/\*([^/]+)/g)
-  varnames = _.map(varnames, function(name){return name.substring(1)})
+  var route = this._getUrlRoute(path);
+  var varnames = this.pathVariableNames(route)
   var matches = path.match(route.regex)
   var retval = {}
   for (var i =0; i < varnames.length; i++){
     retval[varnames[i]] = matches[i + 1]
   }
   return retval;
+}
+
+detour.prototype.pathVariableNames = function(route){
+  if (!route.regex) {
+    return [];
+  }
+  var varnames = route.path.match(/\*([^/]+)/g)
+  varnames = _.map(varnames, function(name){return name.substring(1)})
+  return varnames
 }
 
 detour.prototype.dispatch = function(req, res, next){
@@ -125,6 +130,36 @@ detour.prototype.dispatch = function(req, res, next){
     this.handle500(req, res, ex);
   }
 
+}
+
+detour.prototype.getUrl = function(path, var_map){
+  var_map = var_map || {}
+  var route = this._getUrlRoute(path);
+  var varnames = this.pathVariableNames(route)
+  for(var varname in var_map){
+    if (!_.include(varnames, varname)){
+      throw error("UnknownVariableName",
+                  "One of the provided variable names was unknown.",
+                  varname)
+    }
+  }
+
+  var value;
+  _.each(varnames, function(varname){
+    value = var_map[varname]
+    if (!value){
+      throw error("MissingVariable",
+                  "One of the necessary variables was not provided.",
+                  varname)
+    }
+    var reStr = "\\*" + varname
+    var re = new RegExp(reStr)
+    path = path.replace(re, value)
+  });
+
+   
+
+  return path;
 }
 
 

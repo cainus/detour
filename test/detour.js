@@ -53,12 +53,12 @@ TODOS:
 
 === star routes ===
 - support sub resources of collections
-x d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
-- getUrl should take an object / array of variables to interpolate
 - make star routes set req.pathVariables
-- make getUrl set path variables in starRoutes
 - got to capture variables in the url and set params[]
-- d.url('/this/is/the/path/*varname/sub', {varname : 1234})
+x d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
+x getUrl should take an object / array of variables to interpolate
+x make getUrl set path variables in starRoutes
+x d.url('/this/is/the/path/*varname/sub', {varname : 1234})
 
 === NOT for the router ===
 - d.resources.blank()  // GET only, 204, empty doc.
@@ -100,6 +100,7 @@ three new recognized methods of a resource:
 
 
 VERSION 2:
+- is a search tree faster than a flat table with regexes?
 - is it faster to not use regex at all?
 - programmatic routes?  sub-routers?
 - PATCH?
@@ -267,8 +268,6 @@ describe('detour', function(){
         this.res.expectEnd("hello world")
     })
 
-    it ("can route a module that it requires")
-
     it ("throws an exception if you try to mount a url without a parent", function(){
         var d = new detour()
         var simpleModule = this.simpleModule;
@@ -329,33 +328,71 @@ describe('detour', function(){
 
 	describe('#getUrl', function(){
 
-    it ("returns the url for a root node with an empty mountPath as /", function(){
+    it ("throws an error when the path doesn't exist", function(){
+        var d = new detour()
+        expectException(function(){
+          d.getUrl('/')
+        }, 'NotFound', 'That route is unknown.', '/');
     });
-    it ("returns the url for a root node with a non empty mountPath", function(){
-    });
-    it ("returns the url for a child node", function(){
-    });
+    it ("returns the url for static path as that static path", function(){
+        var d = new detour()
+        var simpleModule = this.simpleModule;
+        d.route('/', simpleModule)
+        var url = d.getUrl('/')
+        url.should.equal('/')
 
-    it ("returns the url for a collection", function(){
-    })
-    it ("returns the url for a collection member", function(){
-    })
-    it ("returns the url for a collection subresource", function(){
+    });
+    it ("throws an error when the given var names are irrelevant", function(){
+        var d = new detour()
+        var simpleModule = this.simpleModule;
+        d.route('/', simpleModule)
+        expectException(function(){
+          var url = d.getUrl('/', {asdf : "asdf"})
+        }, 'UnknownVariableName', 
+            "One of the provided variable names was unknown.",
+            "asdf");
+    });
+    it ("throws an error when the given var names are insufficient", function(){
+        var d = new detour()
+        var simpleModule = this.simpleModule;
+        d.route('/', simpleModule)
+        d.route('/*asdf', simpleModule)
+        expectException(function(){
+          var url = d.getUrl('/*asdf')
+        }, 'MissingVariable', 
+            "One of the necessary variables was not provided.",
+            "asdf");
+    });
+    it ("returns the url for a star path with variables injected", function(){
+        var d = new detour()
+        var simpleModule = this.simpleModule;
+        d.route('/', simpleModule)
+        d.route('/*asdf', simpleModule)
+        var url = d.getUrl('/*asdf', {asdf : 1234})
+        url.should.equal('/1234')
+    });
+    it ("returns the url for a double star path with variables injected", function(){
+        var d = new detour()
+        var simpleModule = this.simpleModule;
+        d.route('/', simpleModule)
+        d.route('/*asdf', simpleModule)
+        d.route('/*asdf/sub', simpleModule)
+        d.route('/*asdf/sub/*sub_id', simpleModule)
+        var url = d.getUrl('/*asdf/sub/*sub_id', {asdf : 1234, sub_id : 4567})
+        url.should.equal('/1234/sub/4567')
     })
 
   })
 
 
   describe('#expressRoute', function(){
-    it ("is function that plugs this into express in as middleware", function(){
+    it ("is a function that plugs this into express in as middleware", function(){
       var d = new detour()
       var called = false;
       d.dispatch = function(req, res, next){ called = true; }
       d.expressMiddleware({}, {}, function(){});
       called.should.equal(true);
-    
     })
-  
   });
 
   describe('#dispatch', function(){
@@ -445,15 +482,6 @@ describe('detour', function(){
         d.dispatch(req, this.res)
         this.res.expectEnd("POST")
     })
-
-/*
-
-    // exception in handler leads to a 500
-    it ("responds with 500 if the handler throws an exception", function(){
-      var d = new detour('api', this.simpleModule);
-      // TODO this should be an express/hottap test
-    })
-*/
 
     describe("when the method is HEAD", function(){
       // HEAD is the same as GET, but without a response body
