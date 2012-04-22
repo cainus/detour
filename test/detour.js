@@ -21,10 +21,10 @@ handled automatically.  Only necessary for dynamic routes.
 should handle conneg.
 
 TODOS:
-- getChildUrls(url) returns the urls of the kids of a given url
 - preliminary examples in the docs
 - support sub resources of collections
 - make named routes work like route('/asdf', module).as('asdf')
+- should log
 
 === middleware ===
 - ?? how to do route-specific middleware like authorization?
@@ -34,14 +34,12 @@ TODOS:
 - d.addMiddlewareExcept(paths_array, [middlewarez])
 - d.routes({'/this/is/the/path' : handler, '/this/is/the/path' : handler}, [middlewarezz])
 
-=== star routes ===
 x make star routes set req.pathVariables (won't do)
 x got to capture variables in the url and set params[] (won't do)
 x d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
 x getUrl should take an object / array of variables to interpolate
 x make getUrl set path variables in starRoutes
 x d.url('/this/is/the/path/*varname/sub', {varname : 1234})
-
 x detour.router returns a function that calls dispatch:  app.use(d.router);
 x d.requestNamespace = "detour" // req.detour will be the detour object
 x d.name('/this/is/the/path', name)  // set
@@ -50,6 +48,7 @@ x handle all methods and 405s
 x does it work on plain express?
 x test what happens if there's an exception in the handler.  500?
 x d.parentUrl(some url)
+x getChildUrls(url) returns the urls of the kids of a given url
 
 three new recognized methods of a resource:
     beforeMethods : function(req, res, next){
@@ -538,6 +537,86 @@ describe('detour', function(){
 
   });
 
+
+
+	describe('#getChildUrls', function(){
+    it ("throws an exception when given url doesn't exist", function(){
+          var d = new detour()
+          expectException(function(){
+            d.getChildUrls('http://asdf.com');
+          }, 'NotFound', 'That route is unknown.', '/');
+
+    });
+    it ("gets child urls for a parent path correctly", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/asdf', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          var urls = d.getChildUrls('http://asdf.com');
+          urls.length.should.equal(1)
+          urls[0].should.equal('http://asdf.com/asdf')
+    });
+    it ("gets multiple child urls for a parent path", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/asdf', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/other', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          var urls = d.getChildUrls('http://asdf.com');
+          urls.length.should.equal(2)
+          urls[0].should.equal('http://asdf.com/asdf')
+          urls[1].should.equal('http://asdf.com/other')
+    });
+    it ("doesn't get grandkids", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/asdf', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/asdf/grankid', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          var urls = d.getChildUrls('http://asdf.com');
+          urls.length.should.equal(1)
+          urls[0].should.equal('http://asdf.com/asdf')
+    });
+    it ("doesn't get starRoutes", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/*asdf', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          var urls = d.getChildUrls('http://asdf.com');
+          urls.length.should.equal(0)
+    }); 
+    it ("can get children of starRoutes", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/*asdf', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/*asdf/grandkid', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          var urls = d.getChildUrls('http://asdf.com/1234');
+          urls.length.should.equal(1)
+          urls[0].should.equal('http://asdf.com/1234/grandkid')
+    });
+  });
 	describe('#getParentUrl', function(){
     it ("throws an exception when getting the parent url of a root node", function(){
           var d = new detour()

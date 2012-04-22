@@ -92,6 +92,30 @@ detour.prototype.dispatch = function(req, res, next){
 
 }
 
+detour.prototype.getChildUrls = function(urlStr){
+  var path = getInputPath(this, urlStr);
+  var urlObj = url.parse(urlStr)
+  var matchingPaths = []
+  var starPath = isStarPath(path)
+  var paths = starPath ?
+                _.pluck(this.starRoutes, "path") :
+                _.keys(this.routes);
+  var that = this;
+  _.each(paths, function(pathStr){
+    if (pathStr != path && startsWith(pathStr, path)){
+      if ((removePrefix(pathStr, path).substring(1).indexOf("/")) === -1){
+        var url = starPath ?
+                    that.getUrl(pathStr, {asdf : 1234}) :
+                    pathStr;
+        var kid = urlObj.protocol + '/' + urlJoin(urlObj.host, url);
+        matchingPaths.push(kid);
+      }
+    }
+  });
+  return matchingPaths;
+}
+
+
 detour.prototype.getParentUrl = function(urlStr){
   var path = getInputPath(this, urlStr);
   if (path == '/'){
@@ -313,7 +337,7 @@ var getMethods = function(handler){
 }
 
 var isStarPath = function(path){
-  return path.indexOf("/*") != -1
+  return !!~path.indexOf("/*")
 }
 
 var addStarRoute = function(d, path, route){
@@ -364,4 +388,14 @@ var pathVariableNames = function(route){
   var varnames = route.path.match(/\*([^/]+)/g)
   varnames = _.map(varnames, function(name){return name.substring(1)})
   return varnames
+}
+
+var startsWith = function(str, prefix){
+  return (str.indexOf(prefix) === 0)
+}
+
+var removePrefix = function(str, prefix){
+  if (startsWith(str, prefix)){
+    return str.substring(prefix.length)
+  }
 }
