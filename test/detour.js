@@ -8,40 +8,23 @@ CONSTRAINTS:
 * the router should handle as many error scenarios as possible to keep the
 work out of the resource
 * http method should not really have anything to do with routing
-* make fs-based routing awesome but not required
-* we want collections and their members in the same file, so they 
-can share code easily.
 * sparse routes suck and are unnecessary
 * routes should be easily settable/gettable by framework and resources
 * router should add HEAD/OPTIONS/405 routes. may be overridden externally
-* make this a new connect-compatible routing middleware to replace express' 
-router
-* ? how will restful file api add directories on the fly? (existance of dir
-in static files can signal to the router that there's a route.  
-programmatic routes then?)
-* ? how to handle sub resources of member resources (sub dir matching 
-collection name)?  almost certainly.
-* ? how to handle sub resources of regular resources in the fs? (same as above?)
+* make this a new connect-compatible routing middleware to replace express' router
 * ? how to do route-specific middleware like authorization?
-* could we add a retrieve() method to modules that retrieves the "resource data" 
+* could we add a fetch() method to modules that retrieves the "resource data" 
 if possible and returns error if not?  that would allow dynamic 404s to be 
 handled automatically.  Only necessary for dynamic routes.
 * we want /asdf/1234/qwer/2345 to 404 if /asdf/1234 is a 404.
+* content negotation has nothing to do with routing either.  the resource 
+should handle conneg.
 
 TODOS:
-- d.parentUrl(some url or name)
-- d.childUrls(some url or name)
-- d.shouldAllowSparseRoutes = true; // default is false. true = throw exceptions
-- getChildUrls(path) returns the urls of the kids of a given node
+- getChildUrls(url) returns the urls of the kids of a given url
 - preliminary examples in the docs
-- implement fetch() we want /asdf/1234/qwer/2345 to 404 if /asdf/1234 is a 404.
-
-=== refactor ===
-- hide private methods entirely
-
-=== test ===
-- test with real app!
-
+- support sub resources of collections
+- make named routes work like route('/asdf', module).as('asdf')
 
 === middleware ===
 - ?? how to do route-specific middleware like authorization?
@@ -52,22 +35,12 @@ TODOS:
 - d.routes({'/this/is/the/path' : handler, '/this/is/the/path' : handler}, [middlewarezz])
 
 === star routes ===
-- support sub resources of collections
-- make star routes set req.pathVariables
-- got to capture variables in the url and set params[]
+x make star routes set req.pathVariables (won't do)
+x got to capture variables in the url and set params[] (won't do)
 x d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
 x getUrl should take an object / array of variables to interpolate
 x make getUrl set path variables in starRoutes
 x d.url('/this/is/the/path/*varname/sub', {varname : 1234})
-
-=== NOT for the router ===
-- d.resources.blank()  // GET only, 204, empty doc.
-- d.resources.empty()  // 404
-- make route('/asdf', './somemodule') do a require('./somemodule') 
-- d.fromFileSystem('./some dir') // https://github.com/coolaj86/node-walk#readme walkSync
-- d.resources.file(filename) // GET only, 200, sendFile
-- does it work with filesystem tree?
-
 
 x detour.router returns a function that calls dispatch:  app.use(d.router);
 x d.requestNamespace = "detour" // req.detour will be the detour object
@@ -76,6 +49,7 @@ x HEAD
 x handle all methods and 405s
 x does it work on plain express?
 x test what happens if there's an exception in the handler.  500?
+x d.parentUrl(some url)
 
 three new recognized methods of a resource:
     beforeMethods : function(req, res, next){
@@ -97,11 +71,9 @@ three new recognized methods of a resource:
     },
 
 
-
-
 VERSION 2:
-- is a search tree faster than a flat table with regexes?
-- is it faster to not use regex at all?
+- implement fetch() we want /asdf/1234/qwer/2345 to 404 if /asdf/1234 is a 404.
+- for star routes... is a search tree faster than a flat table with regexes?
 - programmatic routes?  sub-routers?
 - PATCH?
 - redirects in the router
@@ -111,16 +83,8 @@ regex lookup?  -- perfect for memoization
 - use 'moved permanently' (301) for case sensitivity problems
 in urls.  this is better for SEO
 - unicode route support ( see https://github.com/ckknight/escort )
-- server could note what's acceptable on all routes and check 406. have to do?
-- don't allow status codes to be invalid ones.  does express do this for us?
+- d.shouldAllowSparseRoutes = true; // default is false. true = throw exceptions
 
-=== named routes ===
-- make named routes work -- route('/asdf', module).as('asdf')
-- urls must start with /.  Names cannot contain /
-- handle named routes
-- d.url("some_name", {varname : 1234})
-
-// NOTE: express 3.0 seems to be necessary for HEAD method support
 */
 
 var express = require('express');
@@ -190,13 +154,21 @@ describe('detour', function(){
 	})
 
   describe('#name', function(){
-    it ("as a setter, it throws an exception if the path doesn't exist", function(){
+    it ("throws an exception if the path doesn't exist", function(){
         var d = new detour()
         expectException(function(){
           d.name('/', 'root')
         }, "PathDoesNotExist", "Cannot name a path that doesn't exist", "/")
     })
-    it ("as a setter, it allows a path to be set if it exists", function(){
+    it ("throws an exception if name starts with '/'", function(){
+        var d = new detour()
+        expectException(function(){
+          d.name('/', '/root')
+        }, "InvalidName", 
+            "Cannot name a path with a name that starts with '/'."
+            , '')
+    })
+    it ("allows a path to be set if it exists", function(){
         var d = new detour()
         d.route('/', function(req, res){ res.send("hello world");});
         d.name('/', 'root')
@@ -334,13 +306,18 @@ describe('detour', function(){
           d.getUrl('/')
         }, 'NotFound', 'That route is unknown.', '/');
     });
+    it ("throws an error when the name doesn't exist", function(){
+        var d = new detour()
+        expectException(function(){
+          d.getUrl('some_name')
+        }, 'NotFound', 'That route name is unknown.', 'some_name');
+    });
     it ("returns the url for static path as that static path", function(){
         var d = new detour()
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
         var url = d.getUrl('/')
         url.should.equal('/')
-
     });
     it ("throws an error when the given var names are irrelevant", function(){
         var d = new detour()
@@ -381,9 +358,18 @@ describe('detour', function(){
         var url = d.getUrl('/*asdf/sub/*sub_id', {asdf : 1234, sub_id : 4567})
         url.should.equal('/1234/sub/4567')
     })
-
+    it ("returns the url for a NAMED double star path with variables injected", function(){
+        var d = new detour()
+        var simpleModule = this.simpleModule;
+        d.route('/', simpleModule)
+        d.route('/*asdf', simpleModule)
+        d.route('/*asdf/sub', simpleModule)
+        d.route('/*asdf/sub/*sub_id', simpleModule)
+        d.name('/*asdf/sub/*sub_id', 'subby');
+        var url = d.getUrl('subby', {asdf : 1234, sub_id : 4567})
+        url.should.equal('/1234/sub/4567')
+    })
   })
-
 
   describe('#expressRoute', function(){
     it ("is a function that plugs this into express in as middleware", function(){
@@ -523,7 +509,7 @@ describe('detour', function(){
       it ("sets the proper headers for OPTIONS if the resource exists", function(){
           var d = new detour()
           d.route('/', { GET : function(req, res){
-                              res.send("GET output");
+                              res.end("GET output");
                         }});
           var req = { url : "http://asdf.com/", method : "OPTIONS"}
           d.dispatch(req, this.res)
@@ -532,113 +518,60 @@ describe('detour', function(){
       })
     });
     it ("finds and runs a GET handler at a sub path", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/subpath', { 
+                              GET : function(req, res){
+                                res.end("GET output 2");
+                              },
+                              DELETE : function(req, res){
+                                res.end("delete")
+                              }
+                            });
+          var req = { url : "http://asdf.com/subpath", method : "OPTIONS"}
+          d.dispatch(req, this.res)
+          this.res.expectStatus(204)
+          this.res.expectHeader('Allow', 'OPTIONS,DELETE,GET')
     });
-    it ("finds and runs a GET handler on a collection itself", function(){
-    });
 
-    // TODO
-    it ("finds and runs a GET handler on a collection member");
-
-    // TODO
-    it ("finds and runs a GET handler on a collection member sub resource");
-
-    it ("500s when the handler throws an exception")/*, function(done){
-      var d = new detour('api', {GET : function(req, res){throw "wthizzle";}})
-      this.app.use(function(req, res){ d.dispatch(req, res);} );
-      var url = "http://localhost:9999/api/"
-      this.app.listen(9999, function(){
-        hottap(url).request("GET", function(err, result){
-          result.status.should.equal(500);
-          result.body.should.equal("wthizzle")
-          done();
-        });
-      });
-    })*/
-
-    it ("works with express for simple root route")/*, function(done){
-      var d = new detour('api', this.simpleModule)
-      this.app.use(function(req, res){ d.dispatch(req, res);} );
-      var url = "http://localhost:9999/api/"
-      this.app.listen(9999, function(){
-        hottap(url).request("GET", function(err, result){
-          result.status.should.equal(200);
-          result.body.should.equal("OK")
-          done();
-        });
-      });
-    })*/
-
-    it ("works with express for simple sub route")/*, function(done){
-      var d = new detour('api', this.simpleModule)
-			d.addRoute('/api/other',
-															{GET : function(req, res){res.send("OK 2 !")}});
-      this.app.use(function(req, res){ d.dispatch(req, res);} );
-      var url = "http://localhost:9999/api/"
-      this.app.listen(9999, function(){
-        var url = "http://localhost:9999/api/other"
-        hottap(url).request("GET", function(err, result){
-          result.status.should.equal(200)
-          result.body.should.equal("OK 2 !")
-          done();
-        });
-      });
-    })*/
-
-    // TODO
-    it ("works with express for simple child route");
-
-    // TODO
-    it ("works with express for collection route");
-
-    // TODO
-    it ("works with express for collection member route");
-
-    // TODO
-    it ("works with express for collection sub resource route");
-
-    // express doesn't seem to route bad methods to middleware,
-    // so I can't check for 501 scenarios and handle them.
-    // I'm leaving this commented for now.
-    /*
-    it ("express returns 501 for bad method", function(done){
-      var d = new detour('', this.simpleModule)
-      this.app = express.createServer();
-      //this.app.use(function(req, res){ d.dispatch(req, res);} );
-      this.app.get('/', function(req, res){res.send("TEST");})
-      this.app.listen(9999, function(){
-        var url = "http://localhost:9999/"
-        hottap(url).request("WTF", function(err, result){
-          console.log(err)
-          console.log(result);
-          //result.status.should.equal(200)
-          //result.body.should.equal("OK 2 !")
-          done();
-        });
-      });
-    })
-    */
-
-  });
-
-  describe('#handleOPTIONS', function(){
-    it ("sends OPTIONS,POST,PUT when those methods are defined", function(){
-      var d = new detour()
-      d.route('/', {
-                              POST : function(req, res){}, 
-                              PUT : function(req, res){}
-                             }
-                        );
-      var req = { method : "OPTIONS", url : 'http://localhost:9999/'}
-      d.dispatch(req, this.res)
-      this.res.expectStatus(204)
-      this.res.expectHeader('Allow', 'OPTIONS,POST,PUT')
-    })
   });
 
 	describe('#getParentUrl', function(){
     it ("throws an exception when getting the parent url of a root node", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          expectException(function(){
+            d.getParentUrl('http://asdf.com');
+          }, 'NoParentUrl', 'The given path has no parent path', '/');
     });
     it ("returns the parent url for a child path correctly", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/asdf', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          var url = d.getParentUrl('http://asdf.com/asdf');
+          url.should.equal('http://asdf.com')
+    });
+    it ("returns the parent url for a grandchild path correctly", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/asdf', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/asdf/grandkid', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          var url = d.getParentUrl('http://asdf.com/asdf/grandkid');
+          url.should.equal('http://asdf.com/asdf')
     });
 
   })
