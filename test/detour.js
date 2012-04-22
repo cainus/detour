@@ -30,8 +30,8 @@ TODOS:
 - ?? how to do route-specific middleware like authorization?
 - add middleware to route()
 - add middleware to dispatch()
-- d.addMiddleware(paths_array, [middlewarez])
-- d.addMiddlewareExcept(paths_array, [middlewarez])
+- d.before(paths_array, [middlewarez])
+- d.beforeExcept(paths_array, [middlewarez])
 - d.routes({'/this/is/the/path' : handler, '/this/is/the/path' : handler}, [middlewarezz])
 
 x make star routes set req.pathVariables (won't do)
