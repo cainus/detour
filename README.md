@@ -19,10 +19,11 @@ Hypothesis:  Existing Sinatra-style routers get a few things wrong:
 routing to take the HTTP method into consideration.  For example, a 404 should be thrown only 
 if the URI doesn't exist, and not just if the particular method is unsupported (that's a 405 
 by the way).  The router should get the details right so that the application developer doesn't 
-have to think about it.
+have to think about it, and so people using the API get the right messages, so they can 
+understand the API better. 
 
 * Orphan routes, where a URI like /some/deep/path might exist, but the parent paths 
-(/some and /some/deep) don't, makes for a confusing and arbitrary website/api.  These are still 
+(/some and /some/deep) don't, make for a confusing and arbitrary website/api.  These are still 
 possible, but they're certainly not the default.
 
 * The full power of regular expressions in dynamic routes is not really necessary and just 
