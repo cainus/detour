@@ -5,26 +5,18 @@ var _ = require('underscore');
 /*
 
 CONSTRAINTS:
-* the router should handle as many error scenarios as possible to keep the
-work out of the resource
-* http method should not really have anything to do with routing
-* sparse routes suck and are unnecessary
-* routes should be easily settable/gettable by framework and resources
-* router should add HEAD/OPTIONS/405 routes. may be overridden externally
 * make this a new connect-compatible routing middleware to replace express' router
 * ? how to do route-specific middleware like authorization?
 * could we add a fetch() method to modules that retrieves the "resource data" 
 if possible and returns error if not?  that would allow dynamic 404s to be 
 handled automatically.  Only necessary for dynamic routes.
 * we want /asdf/1234/qwer/2345 to 404 if /asdf/1234 is a 404.
-* content negotation has nothing to do with routing either.  the resource 
-should handle conneg.
 
 TODOS:
 - preliminary examples in the docs
 - support sub resources of collections
-- make named routes work like route('/asdf', module).as('asdf')
-- should log
+- logging
+- add HEAD and OPTIONS to handler at route()-time
 
 === middleware ===
 - ?? how to do route-specific middleware like authorization?
@@ -34,43 +26,9 @@ TODOS:
 - d.beforeExcept(paths_array, [middlewarez])
 - d.routes({'/this/is/the/path' : handler, '/this/is/the/path' : handler}, [middlewarezz])
 
-x make star routes set req.pathVariables (won't do)
-x got to capture variables in the url and set params[] (won't do)
-x d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
-x getUrl should take an object / array of variables to interpolate
-x make getUrl set path variables in starRoutes
-x d.url('/this/is/the/path/*varname/sub', {varname : 1234})
-x detour.router returns a function that calls dispatch:  app.use(d.router);
-x d.requestNamespace = "detour" // req.detour will be the detour object
-x d.name('/this/is/the/path', name)  // set
-x HEAD
-x handle all methods and 405s
-x does it work on plain express?
-x test what happens if there's an exception in the handler.  500?
-x d.parentUrl(some url)
-x getChildUrls(url) returns the urls of the kids of a given url
-
-three new recognized methods of a resource:
-    beforeMethods : function(req, res, next){
-      // useful for running code before all methods,
-      // like authorization stuff
-    }
-
-    beforeChildren : function(req, res, next){
-      // useful for doing stuff before child resources
-      // are accessed.
-    }
-
-    // useful only for wildcard routes
-    fetch : function(req, callback){
-      callback(true);  // automatic 404 on GET, PUT, DELETE
-      // or
-      // callback(false, {}) 
-      // sets req.fetched["obj"] to {} for later use
-    },
-
 
 VERSION 2:
+- dtrace
 - implement fetch() we want /asdf/1234/qwer/2345 to 404 if /asdf/1234 is a 404.
 - for star routes... is a search tree faster than a flat table with regexes?
 - programmatic routes?  sub-routers?
@@ -86,7 +44,6 @@ in urls.  this is better for SEO
 
 */
 
-var express = require('express');
 var detour = require('../detour').detour;
 
 describe('detour', function(){
@@ -174,6 +131,15 @@ describe('detour', function(){
     })
   })
 
+  describe('#as', function(){
+    it ('names the given route', function(){
+        var d = new detour()
+        d.route('/', function(req, res){ res.send("hello world");}).as("root");
+        var url = d.getUrl("root")
+        url.should.equal('/')
+    })
+  });
+
   describe('#pathVariables', function(){
     it ('returns an empty hash for a static route', function(){
       // d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
@@ -188,7 +154,6 @@ describe('detour', function(){
       }, "NotFound", 'That route is unknown.', '/')
     })
     it ('returns a hash of vars for a star route', function(){
-      // d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
       var d = new detour()
       d.route('/', function(req, res){ res.send("hello world");});
       d.route('/*onetwothreefour', function(req, res){ res.send("hello world");});
@@ -201,6 +166,85 @@ describe('detour', function(){
     })
   });
 
+  describe('#shouldThrowExceptions', function(){
+    describe('when set to true', function(){
+      it ('throws an exception when the uri is too long', function(){
+        var d = new detour()
+        d.shouldThrowExceptions = true;
+        var simpleModule = this.simpleModule;
+        var bigurl = "1"
+        _.times(4097, function(){bigurl += '1';})
+        d.route('/', simpleModule)
+        var req = { url : bigurl, method : "PUT"}
+        try {
+          d.dispatch(req, this.res)
+          should.fail('expected exception was not raised')
+        } catch(ex){
+          ex.type.should.equal('414')
+          ex.message.should.equal('Request-URI Too Long')
+        }
+      })
+      it ('throws an exception when the URI is not found', function(){
+        var d = new detour()
+        d.shouldThrowExceptions = true;
+        var req = {url : "http://asdf.com/", method : 'GET'}
+        try {
+          d.dispatch(req, this.res)
+          should.fail('expected exception was not raised')
+        } catch(ex){
+          ex.type.should.equal('404')
+          ex.message.should.equal('Not Found')
+        }
+      });
+      it ("throws an exception on 405s", function(){
+        var d = new detour()
+        d.shouldThrowExceptions = true;
+        var simpleModule = this.simpleModule;
+        d.route('/', simpleModule)
+        d.route('/hello', { GET : function(req, res){res.send("hello world");}});
+        var req = { url : "http://asdf.com/hello", method : "PUT"}
+        try {
+          d.dispatch(req, this.res)
+          should.fail('expected exception was not raised')
+        } catch(ex){
+          ex.type.should.equal('405')
+          ex.message.should.equal('Method Not Allowed')
+        }
+      })
+      it ("throws an exception on 500", function(){
+        var d = new detour()
+        d.shouldThrowExceptions = true;
+        var simpleModule = this.simpleModule;
+        d.route('/', simpleModule)
+        d.route('/fail', { GET : function(req, res){ throw 'wthizzle';}});
+        var req = { url : "http://asdf.com/fail", method : "GET"}
+        try {
+          d.dispatch(req, this.res)
+          should.fail('expected exception was not raised')
+        } catch(ex){
+          ex.type.should.equal('500')
+          ex.message.should.equal('Internal Server Error')
+          ex.detail.should.equal('wthizzle');
+        }
+      })
+
+      it ("throws an exception on 501s", function(){
+        var d = new detour()
+        d.shouldThrowExceptions = true;
+        var simpleModule = this.simpleModule;
+        d.route('/', simpleModule)
+        d.route('/hello', { GET : function(req, res){res.send("hello world");}});
+        var req = { url : "http://asdf.com/hello", method : "TRACE"}
+        try {
+          d.dispatch(req, this.res)
+          should.fail('expected exception was not raised')
+        } catch(ex){
+          ex.type.should.equal('501')
+          ex.message.should.equal('Not Implemented')
+        }
+      })
+    });
+  });
 
 	describe('#getHandler', function(){
     it ("when accessing an undefined url, throws an exception",
@@ -208,9 +252,18 @@ describe('detour', function(){
         var d = new detour()
         expectException(function(){
           d.getHandler('/')
-        }, "NotFound", "That route is unknown.", "/")
+        }, "404", "Not Found", "/")
       }
     )
+    it ("when accessing a too-long url, throws an exception", function(){
+      var d = new detour()
+      var simpleModule = this.simpleModule;
+      var bigurl = "1"
+      _.times(4097, function(){bigurl += '1';})
+      expectException(function(){
+        d.getHandler(bigurl)
+      }, "414", "Request-URI Too Long", '')
+    })
     it ("when accessing a defined url, returns a handler",
       function(){
         var d = new detour()
@@ -370,12 +423,12 @@ describe('detour', function(){
     })
   })
 
-  describe('#expressRoute', function(){
+  describe('#connectRoute', function(){
     it ("is a function that plugs this into express in as middleware", function(){
       var d = new detour()
       var called = false;
       d.dispatch = function(req, res, next){ called = true; }
-      d.expressMiddleware({}, {}, function(){});
+      d.connectMiddleware({}, {}, function(){});
       called.should.equal(true);
     })
   });
@@ -426,7 +479,6 @@ describe('detour', function(){
       var bigurl = "1"
       _.times(4097, function(){bigurl += '1';})
       d.route('/', simpleModule)
-      d.route('/hello', { GET : function(req, res){res.send("hello world");}});
       var req = { url : bigurl, method : "PUT"}
       d.dispatch(req, this.res)
       this.res.expectStatus(414)

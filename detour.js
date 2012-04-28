@@ -6,13 +6,14 @@ var serverSupportedMethods = ["GET", "POST",
 
 function detour(){
   this.shouldHandle404s = true;
+  this.shouldThrowExceptions = false;
   this.routes = {};
   this.starRoutes = [];
   this.names = [];
   this.requestNamespace = 'detour';  // req.detour will have this object
 
   var that = this;
-  this.expressMiddleware = function(req, res, next){
+  this.connectMiddleware = function(req, res, next){
     that.dispatch(req, res, next);
   };
 
@@ -20,6 +21,9 @@ function detour(){
 
 // given a url, return the handler object for it
 detour.prototype.getHandler = function(url){
+  if (url.length > 4096){
+    throw error('414', 'Request-URI Too Long');
+  }
   var path = getPath(url);
   if (!!this.routes[path] && !!this.routes[path].handler){
     return this.routes[path].handler;
@@ -31,7 +35,7 @@ detour.prototype.getHandler = function(url){
   if (!!route && !!route.handler){
     return route.handler;
   }
-  throw error('NotFound', 'That route is unknown.', "" + path);
+  throw error('404', 'Not Found', "" + url);
 };
 
 // get the variables pulled out of a star route
@@ -48,23 +52,28 @@ detour.prototype.pathVariables = function(url){
 };
 
 
+
 detour.prototype.dispatch = function(req, res, next){
   req[this.requestNamespace] = this;
   var handler;
-  if (req.url.length > 4096){
-    return this.handle414(req, res);
-  }
   try {
     handler = this.getHandler(req.url);
   } catch (ex){
-    if (ex.type == "NotFound"){
-      if (this.shouldHandle404s){
-        return this.handle404(req, res);
-      } else {
-        return next();
-      }
+    if (this.shouldThrowExceptions){
+      throw ex;
     }
-    throw ex;
+    switch(ex.type){
+      case "404" :
+        if (this.shouldHandle404s){
+          return this.handle404(req, res);
+        } else {
+          return next();
+        }
+      case "414" :
+        return this.handle414(req, res);
+      default :
+        throw ex;
+    }
   }
 
   var method = req.method;
@@ -73,19 +82,31 @@ detour.prototype.dispatch = function(req, res, next){
     // that it doesn't recognize, so we can't properly 501 on those.
     // We can 501 on ones we don't support (that node does) that 
     // make it through though.
-    return this.handle501(req, res);
+    if (this.shouldThrowExceptions){ 
+      throw error('501', 'Not Implemented');
+    } else {
+      return this.handle501(req, res);
+    }
   }
   if (!handler[method]){
     switch(method){
       case "OPTIONS" : return this.handleOPTIONS(req, res);
       case "HEAD" : return this.handleHEAD(req, res);
-      default : return this.handle405(req, res);
+      default : if (this.shouldThrowExceptions){ 
+                  throw error('405', 'Method Not Allowed');
+                } else {
+                  return this.handle405(req, res);
+                }
     }
   }
   try {
     return handler[method](req, res);
   } catch(ex){
-    this.handle500(req, res, ex);
+    if (this.shouldThrowExceptions){ 
+      throw error('500', 'Internal Server Error', ex);
+    } else {
+      this.handle500(req, res, ex);
+    }
   }
 };
 
@@ -188,12 +209,19 @@ detour.prototype.route = function(path, handler){
     }
   }
 
+  // TODO add HEAD and OPTIONS handlers here, if they don't exist.
+
   if (isStarPath(path)){
     addStarRoute(this, path, { handler : handler});
   } else {
     this.routes[path] = { handler : handler};
   }
 
+  var that = this;
+  // A call to route() will return an object with a function 'as' for
+  // naming the route. eg: d.route('/', handler).as('index')
+  var chainObject = {as : function(name){ that.name(path, name) }};
+  return chainObject;
 };
 
 detour.prototype.handle414 = function(req, res){
@@ -217,7 +245,6 @@ detour.prototype.handle501 = function(req, res){
 };
 
 detour.prototype.handle500 = function(req, res, ex){
-  console.log(ex);
   res.writeHead(500);
   res.end();
 };
@@ -337,6 +364,7 @@ var isStarPath = function(path){
   return !!~path.indexOf("/*");
 };
 
+//TODO this could be done in constant time if done as a tree, without regex
 var addStarRoute = function(d, path, route){
   var escapeSlashes = function(str){
     return;
@@ -371,7 +399,7 @@ var hasParent = function(d, url){
     var route = d.getHandler(parent);
     return true;
   } catch (ex) {
-    if (ex.type == "NotFound"){
+    if (ex.type == "404"){
       return false;
     }
     throw ex;
