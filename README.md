@@ -36,12 +36,13 @@ d.route('', exampleResource)
 var server = http.createServer(function(req, res){
                                  d.dispatch(req, res)
                                });
-server.listen(9999, function(){.
+server.listen(9999, function(){
                        console.log("listening on 9999");
                     });
 ```
 
 
+The tests are currently the best set of more advanced examples that I have time to document at the moment.
 
 ## Automated Tests:
 npm test
