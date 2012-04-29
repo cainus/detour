@@ -1,8 +1,8 @@
 {
       "name": "detour",
-      "description" : "detour is a reimagining of routing in express.js",
-      "keywords" : ["api", "rest", "http", "resource", "routing", "router", "express.js"], 
-      "version": "0.0.1",
+      "description" : "detour is a reimagining of routing in node.js",
+      "keywords" : ["api", "rest", "http", "resource", "routing", "router", "route"], 
+      "version": "0.7.0",
       "bugs": {
        "url": "https://github.com/cainus/detour/issues"
       },
@@ -17,8 +17,6 @@
         } 
       ],
       "dependencies": {
-          "express" : "2.5.9",
-          "express-resource" : "0.2.3",
           "underscore" : ""
       },
       "devDependencies" : {
@@ -26,5 +24,8 @@
           "hottap" : "1.0.0",
           "mocha" : "0.14.1",
           "should" : "0.6.0"
-      }
+      },
+      "repository" : "git@github.com:cainus/detour.git",
+      "main" : "./detour",
+      "license": "MIT"
 }

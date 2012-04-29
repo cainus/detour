@@ -1,49 +1,6 @@
-var express = require('express');
 var should = require('should');
 var hottap = require('hottap').hottap;
 var _ = require('underscore');
-/*
-
-CONSTRAINTS:
-* make this a new connect-compatible routing middleware to replace express' router
-* ? how to do route-specific middleware like authorization?
-* could we add a fetch() method to modules that retrieves the "resource data" 
-if possible and returns error if not?  that would allow dynamic 404s to be 
-handled automatically.  Only necessary for dynamic routes.
-* we want /asdf/1234/qwer/2345 to 404 if /asdf/1234 is a 404.
-
-TODOS:
-- preliminary examples in the docs
-- support sub resources of collections
-- logging
-- add HEAD and OPTIONS to handler at route()-time
-
-=== middleware ===
-- ?? how to do route-specific middleware like authorization?
-- add middleware to route()
-- add middleware to dispatch()
-- d.before(paths_array, [middlewarez])
-- d.beforeExcept(paths_array, [middlewarez])
-- d.routes({'/this/is/the/path' : handler, '/this/is/the/path' : handler}, [middlewarezz])
-
-
-VERSION 2:
-- dtrace
-- implement fetch() we want /asdf/1234/qwer/2345 to 404 if /asdf/1234 is a 404.
-- for star routes... is a search tree faster than a flat table with regexes?
-- programmatic routes?  sub-routers?
-- PATCH?
-- redirects in the router
-- conditional GET, e-tags, caching, 304
-- cache recent urls / route combinations instead of requiring
-regex lookup?  -- perfect for memoization
-- use 'moved permanently' (301) for case sensitivity problems
-in urls.  this is better for SEO
-- unicode route support ( see https://github.com/ckknight/escort )
-- d.shouldAllowSparseRoutes = true; // default is false. true = throw exceptions
-
-*/
-
 var detour = require('../detour').detour;
 
 describe('detour', function(){
@@ -94,19 +51,11 @@ describe('detour', function(){
 
 	beforeEach(function(){
     this.res = new FakeRes()
-		this.app = {} //express.createServer();
     this.simpleModule = {GET : function(req, res){res.send("OK");}}
     this.simpleCollectionModule = {  
                                     GET : function(req, res){res.send("OK");},
                                     collectionGET : function(req, res){res.send("OK");}
                                   }
-	})
-	afterEach(function(){
-    try {
-      this.app.close();
-    } catch (ex){
-      // do nothing. assumed already closed.
-    }
 	})
 
   describe('#name', function(){
@@ -423,7 +372,7 @@ describe('detour', function(){
     })
   })
 
-  describe('#connectRoute', function(){
+  describe('#connectMiddleware', function(){
     it ("is a function that plugs this into express in as middleware", function(){
       var d = new detour()
       var called = false;
@@ -432,6 +381,43 @@ describe('detour', function(){
       called.should.equal(true);
     })
   });
+
+  describe('#before', function(){
+    it ('allows middleware to be added to various paths', function(){
+      var d = new detour()
+      d.route('/', { GET : function(req, res){res.end("GET");}}).as("index");
+      d.route('/*sub', { GET : function(req, res){res.end("subGET");}});
+      d.before(['/', '/*sub'], [function(req, res, next){
+                                  res.end("early out");
+                                }]);
+      var req = { url : "http://asdf.com/", method : "GET"}
+      d.dispatch(req, this.res)
+      this.res.body.should.equal("early out")
+      var req = { url : "http://asdf.com/1234", method : "GET"}
+      d.dispatch(req, this.res)
+      this.res.body.should.equal("early out")
+    })
+    it ('allows middleware to be added to various paths and still routes', function(){
+      var d = new detour()
+      var urls = [];
+      d.route('/', { GET : function(req, res){res.end("GET");}}).as("index");
+      d.route('/*sub', { GET : function(req, res){res.end("subGET");}});
+      d.before(['index', '/*sub'], [function(req, res, next){
+                                  urls.push(req.url)
+                                  next()
+                                }]);
+      var req = { url : "http://asdf.com/", method : "GET"}
+      d.dispatch(req, this.res)
+      this.res.body.should.equal("GET")
+      var req = { url : "http://asdf.com/1234", method : "GET"}
+      d.dispatch(req, this.res)
+      this.res.body.should.equal("subGET")
+      urls.length.should.equal(2)
+      urls[0].should.equal('http://asdf.com/');
+      urls[1].should.equal('http://asdf.com/1234');
+    })
+  });
+
 
   describe('#dispatch', function(){
 
@@ -492,6 +478,7 @@ describe('detour', function(){
       var req = { url : "http://asdf.com/hello", method : "PUT"}
       d.dispatch(req, this.res)
       this.res.expectStatus(405)
+      this.res.expectHeader('Allow', 'OPTIONS,GET,HEAD')
     })
     it ("500s on a directly thrown exception", function(){
       var d = new detour()
@@ -514,7 +501,7 @@ describe('detour', function(){
     })
     it ("can route an object with a POST", function(){
         var d = new detour()
-        d.route('/', { POST : function(req, res){return "POST";}});
+        d.route('/', { POST : function(req, res){res.end("POST");}});
         var req = { url : "http://asdf.com/", method : "POST"}
         d.dispatch(req, this.res)
         this.res.expectEnd("POST")
@@ -544,7 +531,14 @@ describe('detour', function(){
                               res.end("GET output");
                         }});
           var req = { url : "http://asdf.com/", method : "HEAD"}
-          d.dispatch(req, this.res)
+          try {
+            d.handle500 = function(req, res, ex){
+              console.log(ex);
+            }
+            d.dispatch(req, this.res)
+          } catch (ex){
+            console.log(ex);
+          }
           this.res.expectStatus(204)
           this.res.expectHeader("Content-Type", 'application/wth')
       })
@@ -565,7 +559,7 @@ describe('detour', function(){
           var req = { url : "http://asdf.com/", method : "OPTIONS"}
           d.dispatch(req, this.res)
           this.res.expectStatus(204)
-          this.res.expectHeader('Allow', 'OPTIONS,GET')
+          this.res.expectHeader('Allow', 'OPTIONS,GET,HEAD')
       })
     });
     it ("finds and runs a GET handler at a sub path", function(){
@@ -584,7 +578,7 @@ describe('detour', function(){
           var req = { url : "http://asdf.com/subpath", method : "OPTIONS"}
           d.dispatch(req, this.res)
           this.res.expectStatus(204)
-          this.res.expectHeader('Allow', 'OPTIONS,DELETE,GET')
+          this.res.expectHeader('Allow', 'OPTIONS,DELETE,GET,HEAD')
     });
 
   });
