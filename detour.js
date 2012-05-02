@@ -21,7 +21,7 @@ function detour(){
 
 // given a url, return the handler object for it
 detour.prototype.getHandler = function(url){
-  var route = this.getRoute(url)
+  var route = this.getRoute(url);
   if (!!route.handler){
     return route.handler;
   }
@@ -77,13 +77,14 @@ detour.prototype.dispatch = function(req, res, next){
         } else {
           return next();
         }
+        break;
       case "414" :
         return this.handle414(req, res);
       default :
         throw ex;
     }
   }
-  var handler = route.handler;
+  handler = route.handler;
 
   var method = req.method;
   if (!_.include(serverSupportedMethods, method)){
@@ -155,7 +156,7 @@ detour.prototype.getParentUrl = function(urlStr){
 
 detour.prototype.getUrl = function(path, var_map){
   // if it's a name and not a path, get the path...
-  path = pathIfName(this, path)
+  path = pathIfName(this, path);
 
   var_map = var_map || {};
   var route = getUrlRoute(this, path);
@@ -200,7 +201,7 @@ detour.prototype.before = function(paths, middlewares){
       route.middlewares.push(m);
     });
   });
-}
+};
 
 detour.prototype.route = function(path, handler){
 
@@ -231,15 +232,15 @@ detour.prototype.route = function(path, handler){
     }
   }
 
+  var that = this;
+
   // add handler for HEAD if it doesn't exist
-  if (!handler["HEAD"] && !!handler["GET"]){
-    var that = this;
-    handler.HEAD = function(req, res){ that.handleHEAD(req, res) };
+  if (!handler.HEAD && !!handler.GET){
+    handler.HEAD = function(req, res){ that.handleHEAD(req, res); };
   }
   // add handler for OPTIONS if it doesn't exist
-  if (!handler["OPTIONS"]){
-    var that = this;
-    handler.OPTIONS = function(req, res){ that.handleOPTIONS(req, res) };
+  if (!handler.OPTIONS){
+    handler.OPTIONS = function(req, res){ that.handleOPTIONS(req, res); };
   }
 
   if (isStarPath(path)){
@@ -248,10 +249,9 @@ detour.prototype.route = function(path, handler){
     this.routes[path] = { handler : handler, middlewares : []};
   }
 
-  var that = this;
   // A call to route() will return an object with a function 'as' for
   // naming the route. eg: d.route('/', handler).as('index')
-  var chainObject = {as : function(name){ that.name(path, name) }};
+  var chainObject = {as : function(name){ that.name(path, name); }};
   return chainObject;
 };
 
@@ -273,7 +273,7 @@ detour.prototype.handle405 = function(req, res){
 
 detour.prototype.setAllowHeader = function(req, res){
   res.setHeader('Allow', allowHeader(this, req.url));
-}
+};
 
 detour.prototype.handle501 = function(req, res){
   res.writeHead(501);
@@ -342,9 +342,9 @@ var executeMiddleware = function(middlewares, req, res, done){
         return done();
       }
     }
-  }
+  };
   next();
-}
+};
 
 
 // unexposed helpers ---------
@@ -353,7 +353,7 @@ var allowHeader = function(d, url){
   var methods = getMethods(handler);
   methods = _.union(["OPTIONS"], methods);
   return methods.join(",");
-}
+};
 
 var urlJoin = function(){
 	// put a fwd-slash between all pieces and remove any redundant slashes
@@ -423,6 +423,7 @@ var isStarPath = function(path){
   return !!~path.indexOf("/*");
 };
 
+
 //TODO this could be done in constant time if done as a tree, without regex
 var addStarRoute = function(d, path, route){
   var escapeSlashes = function(str){
@@ -475,7 +476,7 @@ var pathIfName = function(d, path){
       }
     }
     return path;
-}
+};
 
 var pathVariableNames = function(route){
   if (!route.regex) {
