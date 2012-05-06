@@ -9,10 +9,8 @@ function detour(){
   this.shouldThrowExceptions = false;
   this.routes = {};
   this.starRoutes = [];
-  this.starTree = new StarTreeNode();
   this.names = [];
   this.requestNamespace = 'detour';  // req.detour will have this object
-  this.useStarTree = false;
   var that = this;
   this.connectMiddleware = function(req, res, next){
     that.dispatch(req, res, next);
@@ -129,18 +127,7 @@ detour.prototype.getChildUrls = function(urlStr){
   var starPath = isStarPath(path);
   var paths;
   if (starPath){
-    if (this.useStarTree){
-      var thisRoute = this.starTree.getPath(path);
-      paths = _.keys(thisRoute.kids)
-      if (paths[0] == '*'){
-        paths = [];
-      }
-      paths = _.map(paths, function(kidpath){
-        return urlJoin(path, kidpath)
-      });
-    } else {
-      paths = _.pluck(this.starRoutes, "path")
-    }
+    paths = _.pluck(this.starRoutes, "path")
   } else {
     paths = _.keys(this.routes);
   }
@@ -393,16 +380,6 @@ var getInputPath = function(d, url){
   }
   // check the starRoutes if it's not static...
   return findStarRoute(d, path).path;
-  /*
-  var route = _.find(d.starRoutes, function(route){
-    return !!path.match(route.regex);
-  });
-  if (!!route && !!route.handler){
-    return route.path;
-  }
-
-  throw error('NotFound', 'That route is unknown.', "" + path);
-  */
 };
 
 // Given a url get the route object that matches it.
@@ -419,16 +396,6 @@ var getUrlRoute = function(d, url){
   }
   // check the starRoutes if it's not static...
   return findStarRoute(d, path);
-  /*
-  var route = _.find(d.starRoutes, function(route){
-    return !!path.match(route.regex);
-  });
-  if (!!route && !!route.handler){
-    return route;
-  }
-
-  throw error('NotFound', 'That route is unknown.', "" + path);
-  */
 };
 
 var handlerHasHttpMethods = function(handler){
@@ -446,104 +413,28 @@ var isStarPath = function(path){
   return !!~path.indexOf("/*");
 };
 
-//412, 41
 var findStarRoute = function(d, path){
-  if (d.useStarTree){
-    var route = d.starTree.getPath(path).route;
-  } else {
-    var route = _.find(d.starRoutes, function(route){
-      return !!path.match(route.regex);
-    });
-  }
+  var route = _.find(d.starRoutes, function(route){
+    return !!path.match(route.regex);
+  });
   if (!!route && !!route.handler){
     return route;
   }
   throw error('NotFound', 'That route is unknown.', "" + path);
 }
 
-//TODO this could be done in constant time if done as a tree, without regex
 var addStarRoute = function(d, path, route){
   var escapeSlashes = function(str){
     return;
   };
   // change path to a regex
   var reStr = path.replace(/\//g, '\\/');
-  // change *paths to a match non-slash
+  // change *paths to match a non-slash
   reStr = "^" + reStr.replace(/\*[^\/]+/g, "([^/]+)") + "$";
   var re = new RegExp(reStr);
   route.regex = re;
   route.path = path;
-  if (d.useStarTree){
-    d.starTree.addPath(path, route);
-  } else {
-    d.starRoutes.push(route);
-  }
-};
-
-
-var StarTreeNode = function(){
-  this.route = null;
-  this.kids = {};
-};
-
-StarTreeNode.prototype.addPath = function(path, route){
-  var origPath = path;
-  if (!_.isArray(path)){
-    path = path.split("/");
-  }
-  while (path[0] === ''){
-    path.shift();
-  }
-  if (path.length > 1){
-    var kidname = _.first(path)
-    if (kidname[0] === '*'){
-      kidname = '*';
-    }
-    var kid = this.kids[kidname];
-    if (!kid){
-      // add null node
-      var kid = new StarTreeNode();
-      this.kids[kidname] = kid;
-      kid.addPath(_.rest(path), route);
-      return;
-    } else {
-      kid.addPath(_.rest(path), route);
-    }
-  } else {
-    path = path[0];
-    var kid = new StarTreeNode();
-    if (path[0] === '*'){
-      kid.route = route;
-      this.kids['*'] = kid;
-    } else {
-      kid.route = route;
-      this.kids[path] = kid;
-    }
-  }
-};
-
-StarTreeNode.prototype.getPath = function(path){
-  var origPath = path;
-  if (!_.isArray(path)){
-    path = path.split("/");
-  }
-  while (path[0] === ''){
-    path.shift();
-  }
-  if (path.length === 0){
-    return this;
-  }
-  var kidname = _.first(path);
-  var kid = this.kids[kidname];
-  if (!!!kid){
-    kid = this.kids['*'];
-  }
-  if (!!kid){
-    var kidkid = kid.getPath(_.rest(path));
-    return kidkid;
-  } else {
-    throw error('404', 'Not Found', origPath);
-  }
+  d.starRoutes.push(route);
 };
 
 
