@@ -220,7 +220,7 @@ detour.prototype.route = function(path, handler){
   if (!isRootPath(path) && !hasParent(this, path)){
     throw error('ParentDoesNotExist',
       "The route you're trying to add does not have a parent route defined.", 
-      '/asdf');
+      path);
   }
 
   if (_.isFunction(handler)){
