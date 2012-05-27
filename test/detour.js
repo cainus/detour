@@ -9,8 +9,12 @@ describe('detour', function(){
     try {
       f();
     } catch(ex){
-      ex.type.should.equal(extype)
+      ex.name.should.equal(extype)
       ex.message.should.equal(exmessage)
+      if (!_.isString(ex.detail)){
+        ex.detail = JSON.stringify(ex.detail);
+        exdetail = JSON.stringify(exdetail);
+      }
       ex.detail.should.equal(exdetail)
       return;
     }
@@ -71,7 +75,7 @@ describe('detour', function(){
           d.name('/', '/root')
         }, "InvalidName", 
             "Cannot name a path with a name that starts with '/'."
-            , '')
+            , {})
     })
     it ("allows a path to be set if it exists", function(){
         var d = new detour()
@@ -129,7 +133,7 @@ describe('detour', function(){
           d.dispatch(req, this.res)
           should.fail('expected exception was not raised')
         } catch(ex){
-          ex.type.should.equal('414')
+          ex.name.should.equal('414')
           ex.message.should.equal('Request-URI Too Long')
         }
       })
@@ -141,7 +145,7 @@ describe('detour', function(){
           d.dispatch(req, this.res)
           should.fail('expected exception was not raised')
         } catch(ex){
-          ex.type.should.equal('404')
+          ex.name.should.equal('404')
           ex.message.should.equal('Not Found')
         }
       });
@@ -156,7 +160,7 @@ describe('detour', function(){
           d.dispatch(req, this.res)
           should.fail('expected exception was not raised')
         } catch(ex){
-          ex.type.should.equal('405')
+          ex.name.should.equal('405')
           ex.message.should.equal('Method Not Allowed')
         }
       })
@@ -171,7 +175,7 @@ describe('detour', function(){
           d.dispatch(req, this.res)
           should.fail('expected exception was not raised')
         } catch(ex){
-          ex.type.should.equal('500')
+          ex.name.should.equal('500')
           ex.message.should.equal('Internal Server Error')
           ex.detail.should.equal('wthizzle');
         }
@@ -188,7 +192,7 @@ describe('detour', function(){
           d.dispatch(req, this.res)
           should.fail('expected exception was not raised')
         } catch(ex){
-          ex.type.should.equal('501')
+          ex.name.should.equal('501')
           ex.message.should.equal('Not Implemented')
         }
       })
@@ -211,7 +215,7 @@ describe('detour', function(){
       _.times(4097, function(){bigurl += '1';})
       expectException(function(){
         d.getHandler(bigurl)
-      }, "414", "Request-URI Too Long", '')
+      }, "414", "Request-URI Too Long", {})
     })
     it ("when accessing a defined url, returns a handler",
       function(){
@@ -294,7 +298,7 @@ describe('detour', function(){
            },
            "HandlerHasNoHttpMethods", 
            "The handler you're trying to route to should implement HTTP methods.",
-           ''
+           {}
         )
     });
   });
@@ -475,7 +479,7 @@ describe('detour', function(){
       var simpleModule = this.simpleModule;
       d.route('/', simpleModule)
       d.route('/hello', { GET : function(req, res){res.send("hello world");}});
-      var req = { url : "http://asdf.com/hello", method : "PUT"}
+      var req = { url : "http://asdf.com/hello", method : "PUT"};
       d.dispatch(req, this.res)
       this.res.expectStatus(405)
       this.res.expectHeader('Allow', 'OPTIONS,GET,HEAD')
@@ -602,8 +606,24 @@ describe('detour', function(){
                               res.end("GET output");
                         }});
           var urls = d.getChildUrls('http://asdf.com');
-          urls.length.should.equal(1)
-          urls[0].should.equal('http://asdf.com/asdf')
+          var keys = _.keys(urls);
+          keys.length.should.equal(1);
+          keys[0].should.equal('/asdf')
+          should.not.exist(urls['/asdf'])
+    });
+    it ("gets child urls for a parent path correctly when given just the path", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/asdf', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          var urls = d.getChildUrls('/');
+          var keys = _.keys(urls);
+          keys.length.should.equal(1);
+          keys[0].should.equal('/asdf')
+          should.not.exist(urls['/asdf'])
     });
     it ("gets multiple child urls for a parent path", function(){
           var d = new detour()
@@ -617,9 +637,12 @@ describe('detour', function(){
                               res.end("GET output");
                         }});
           var urls = d.getChildUrls('http://asdf.com');
-          urls.length.should.equal(2)
-          urls[0].should.equal('http://asdf.com/asdf')
-          urls[1].should.equal('http://asdf.com/other')
+          var keys = _.keys(urls);
+          keys.length.should.equal(2);
+          keys[0].should.equal('/asdf')
+          keys[1].should.equal('/other')
+          should.not.exist(urls['/asdf'])
+          should.not.exist(urls['/other'])
     });
     it ("doesn't get grandkids", function(){
           var d = new detour()
@@ -632,9 +655,12 @@ describe('detour', function(){
           d.route('/asdf/grankid', { GET : function(req, res){
                               res.end("GET output");
                         }});
+
           var urls = d.getChildUrls('http://asdf.com');
-          urls.length.should.equal(1)
-          urls[0].should.equal('http://asdf.com/asdf')
+          var keys = _.keys(urls);
+          keys.length.should.equal(1);
+          keys[0].should.equal('/asdf')
+          should.not.exist(urls['/asdf'])
     });
     it ("doesn't get starRoutes", function(){
           var d = new detour()
@@ -645,23 +671,63 @@ describe('detour', function(){
                               res.end("GET output");
                         }});
           var urls = d.getChildUrls('http://asdf.com');
-          urls.length.should.equal(0)
+          var keys = _.keys(urls);
+          keys.length.should.equal(0);
     }); 
+
     it ("can get children of starRoutes", function(){
           var d = new detour()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
-                        }});
+                        }}).as('root');
           d.route('/*asdf', { GET : function(req, res){
                               res.end("GET output");
-                        }});
+                        }}).as('asdf*');
           d.route('/*asdf/grandkid', { GET : function(req, res){
                               res.end("GET output");
-                        }});
+                        }}).as('grandkid');
           var urls = d.getChildUrls('http://asdf.com/1234');
-          urls.length.should.equal(1)
-          urls[0].should.equal('http://asdf.com/1234/grandkid')
+          var keys = _.keys(urls);
+          keys.length.should.equal(1) 
+          keys[0].should.equal('/1234/grandkid');
     });
+
+    it ("populates the names of child routes where possible", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }}).as('root');
+          d.route('/asdf', { GET : function(req, res){
+                              res.end("GET output");
+                        }}).as('asdf*');
+          d.route('/asdf/grandkid', { GET : function(req, res){
+                              res.end("GET output");
+                        }}).as('grandkid');
+          var urls = d.getChildUrls('http://asdf.com/asdf');
+          var keys = _.keys(urls);
+          keys.length.should.equal(1) 
+          keys[0].should.equal('/asdf/grandkid');
+          urls['/asdf/grandkid'].should.equal('grandkid')
+    });
+
+    it ("populates the names of child routes of starRoutes where possible", function(){
+          var d = new detour()
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }}).as('root');
+          d.route('/*asdf', { GET : function(req, res){
+                              res.end("GET output");
+                        }}).as('asdf*');
+          d.route('/*asdf/grandkid', { GET : function(req, res){
+                              res.end("GET output");
+                        }}).as('grandkid');
+          var urls = d.getChildUrls('http://asdf.com/1234');
+          var keys = _.keys(urls);
+          keys.length.should.equal(1) 
+          keys[0].should.equal('/1234/grandkid');
+          urls['/1234/grandkid'].should.equal('grandkid')
+    });
+
   });
 	describe('#getParentUrl', function(){
     it ("throws an exception when getting the parent url of a root node", function(){
@@ -670,7 +736,7 @@ describe('detour', function(){
                               res.end("GET output");
                         }});
           expectException(function(){
-            d.getParentUrl('http://asdf.com');
+              d.getParentUrl('http://asdf.com');
           }, 'NoParentUrl', 'The given path has no parent path', '/');
     });
     it ("returns the parent url for a child path correctly", function(){

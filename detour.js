@@ -4,12 +4,26 @@ var serverSupportedMethods = ["GET", "POST",
                               "PUT", "DELETE",
                               "HEAD", "OPTIONS"];
 
+
+DetourError = function(name, message, detail){
+  var err = Error.call(this, name, message);
+  err.name = name;
+  err.message = message;
+  err.detail = detail || {};
+  return err;
+}
+DetourError.prototype = Object.create(Error.prototype, { 
+  constructor: { value: DetourError }
+});
+
+var error = new DetourError("testerror", "mesage");
+
 function detour(){
   this.shouldHandle404s = true;
   this.shouldThrowExceptions = false;
   this.routes = {};
   this.starRoutes = [];
-  this.names = [];
+  this.names = {};
   this.requestNamespace = 'detour';  // req.detour will have this object
   var that = this;
   this.connectMiddleware = function(req, res, next){
@@ -24,12 +38,12 @@ detour.prototype.getHandler = function(url){
   if (!!route.handler){
     return route.handler;
   }
-  throw error('404', 'Not Found', "" + url);
+  throw new DetourError('404', 'Not Found', "" + url);
 };
 
 detour.prototype.getRoute = function(url){
   if (url.length > 4096){
-    throw error('414', 'Request-URI Too Long');
+    throw new DetourError('414', 'Request-URI Too Long');
   }
   var path = getPath(url);
   if (!!this.routes[path] && !!this.routes[path].handler){
@@ -39,8 +53,8 @@ detour.prototype.getRoute = function(url){
   try {
     return findStarRoute(this, path);
   } catch (ex) {
-    if (!!ex.type && ex.type == 'NotFound'){
-      throw error('404', 'Not Found', "" + url);
+    if (!!ex.name && ex.name == 'NotFound'){
+      throw new DetourError('404', 'Not Found', "" + url);
     } else {
       throw ex;
     }
@@ -71,7 +85,7 @@ detour.prototype.dispatch = function(req, res, next){
     if (this.shouldThrowExceptions){
       throw ex;
     }
-    switch(ex.type){
+    switch(ex.name){
       case "404" :
         if (this.shouldHandle404s){
           return this.handle404(req, res);
@@ -94,14 +108,14 @@ detour.prototype.dispatch = function(req, res, next){
     // We can 501 on ones we don't support (that node does) that 
     // make it through though.
     if (this.shouldThrowExceptions){ 
-      throw error('501', 'Not Implemented');
+      throw new DetourError('501', 'Not Implemented');
     } else {
       return this.handle501(req, res);
     }
   }
   if (!handler[method]){
     if (this.shouldThrowExceptions){ 
-      throw error('405', 'Method Not Allowed');
+      throw new DetourError('405', 'Method Not Allowed');
     } else {
       return this.handle405(req, res);
     }
@@ -113,44 +127,72 @@ detour.prototype.dispatch = function(req, res, next){
     });
   } catch(ex){
     if (this.shouldThrowExceptions){ 
-      throw error('500', 'Internal Server Error', ex);
+      throw new DetourError('500', 'Internal Server Error', ex);
     } else {
       this.handle500(req, res, ex);
     }
   }
 };
 
-detour.prototype.getChildUrls = function(urlStr){
-  var path = getInputPath(this, urlStr);
-  var urlObj = url.parse(urlStr);
+
+var getMatchingRoutePaths = function(that, urlStr, pathVars){
   var matchingPaths = [];
+  var path = getInputPath(that, urlStr);
+  var urlObj = url.parse(urlStr);
   var starPath = isStarPath(path);
   var paths;
   if (starPath){
-    paths = _.pluck(this.starRoutes, "path")
+    paths = _.pluck(that.starRoutes, "path")
   } else {
-    paths = _.keys(this.routes);
+    paths = _.keys(that.routes);
   }
-  var that = this;
   _.each(paths, function(pathStr){
     if (pathStr != path && startsWith(pathStr, path)){
       if ((removePrefix(pathStr, path).substring(1).indexOf("/")) === -1){
-        var url = starPath ?
-                    that.getUrl(pathStr, {asdf : 1234}) :
-                    pathStr;
-        var kid = urlObj.protocol + '/' + urlJoin(urlObj.host, url);
-        matchingPaths.push(kid);
+        if (starPath){
+          var url = that.getUrl(pathStr, pathVars);
+        } else {
+          var url = pathStr;
+        }
+        var kid;
+        if (!!urlObj.protocol && !!urlObj.host){
+          kid = urlObj.protocol + '/' + urlJoin(urlObj.host, url);
+        } else {
+          kid = urlJoin(url);
+        }
+        matchingPaths.push(pathStr);
       }
     }
   });
   return matchingPaths;
+}
+
+detour.prototype.getChildUrls = function(urlStr){
+  var pathVars = this.pathVariables(urlStr);
+  var that = this;
+  var matchingPaths = getMatchingRoutePaths(that, urlStr, pathVars);
+  var urlObj = {}
+  _.each(matchingPaths, function(path){
+    var pathonly = getPath(path);
+    var pathonly = that.getUrl(pathonly, pathVars)
+    try {
+      urlObj[pathonly] = pathToName(that, path);
+    } catch(ex) {
+      if (ex == 'NotFound'){
+        urlObj[pathonly] = null;
+      } else {
+        throw ex;
+      }
+    }
+  });
+  return urlObj;
 };
 
 
 detour.prototype.getParentUrl = function(urlStr){
   var path = getInputPath(this, urlStr);
   if (path == '/'){
-    throw error('NoParentUrl', 'The given path has no parent path', '/');
+    throw new DetourError('NoParentUrl', 'The given path has no parent path', '/');
   }
   var pieces = path.split('/');
   pieces.pop();
@@ -167,7 +209,7 @@ detour.prototype.getUrl = function(path, var_map){
   var varnames = pathVariableNames(route);
   for(var varname in var_map){
     if (!_.include(varnames, varname)){
-      throw error("UnknownVariableName",
+      throw new DetourError("UnknownVariableName",
                   "One of the provided variable names was unknown.",
                   varname);
     }
@@ -176,7 +218,7 @@ detour.prototype.getUrl = function(path, var_map){
   _.each(varnames, function(varname){
     value = var_map[varname];
     if (!value){
-      throw error("MissingVariable",
+      throw new DetourError("MissingVariable",
                   "One of the necessary variables was not provided.",
                   varname);
     }
@@ -210,7 +252,7 @@ detour.prototype.before = function(paths, middlewares){
 detour.prototype.route = function(path, handler){
 
   if (_.isNull(handler) || _.isUndefined(handler)){
-      throw error('ArgumentError',
+      throw new DetourError('ArgumentError',
         "route() requires a handler argument.",
         '');
   }
@@ -218,7 +260,7 @@ detour.prototype.route = function(path, handler){
   path = urlJoin(path);
 
   if (!isRootPath(path) && !hasParent(this, path)){
-    throw error('ParentDoesNotExist',
+    throw new DetourError('ParentDoesNotExist',
       "The route you're trying to add does not have a parent route defined.", 
       path);
   }
@@ -228,7 +270,7 @@ detour.prototype.route = function(path, handler){
     handler = {GET : handler};
   } else {
     if (!handlerHasHttpMethods(handler)){
-      throw error(
+      throw new DetourError(
            "HandlerHasNoHttpMethods", 
            "The handler you're trying to route to should implement HTTP methods.",
            ''
@@ -311,15 +353,15 @@ detour.prototype.handleHEAD = function(req, res){
 
 detour.prototype.name = function(path, name){
   if (name[0] == '/'){
-    throw error("InvalidName", 
+    throw new DetourError("InvalidName", 
                 "Cannot name a path with a name that starts with '/'.",
                "");
   }
   try {
     path = getInputPath(this, path);
   } catch(ex) {
-    if (ex.type == "NotFound"){
-    throw error("PathDoesNotExist", 
+    if (ex.name == "NotFound"){
+    throw new DetourError("PathDoesNotExist", 
                 "Cannot name a path that doesn't exist",
                "/");
     }
@@ -420,7 +462,7 @@ var findStarRoute = function(d, path){
   if (!!route && !!route.handler){
     return route;
   }
-  throw error('NotFound', 'That route is unknown.', "" + path);
+  throw DetourError('NotFound', 'That route is unknown.', "" + path);
 }
 
 var addStarRoute = function(d, path, route){
@@ -443,12 +485,6 @@ var isRootPath = function(url){
   return url == "/";
 };
 
-var error = function(type, message, detail){
-  message = message || '';
-  detail = detail || '';
-  return {type : type, message : message, detail : detail};
-};
-
 
 
 var hasParent = function(d, url){
@@ -460,19 +496,33 @@ var hasParent = function(d, url){
     var route = d.getHandler(parent);
     return true;
   } catch (ex) {
-    if (ex.type == "404"){
+    if (ex.name == "404"){
       return false;
     }
     throw ex;
   }
 };
 
+
+var pathToName = function(d, inpath){
+    var outname = null;
+    inpath = getPath(inpath);
+    _.any(d.names, function(path, name){
+      if (path == inpath){
+        outname = name;
+        return true;
+      }
+    });
+    if (outname === null){ throw "NotFound"; }
+    return outname;
+}
+
 var pathIfName = function(d, path){
     if (path[0] != '/') {
       var origPath = path;
       path = d.names[path];
       if (!path){
-        throw error("NotFound", "That route name is unknown.", origPath);
+        throw new DetourError("NotFound", "That route name is unknown.", origPath);
       }
     }
     return path;
