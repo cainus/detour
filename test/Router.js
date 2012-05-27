@@ -1,9 +1,9 @@
 var should = require('should');
 var hottap = require('hottap').hottap;
 var _ = require('underscore');
-var detour = require('../detour').detour;
+var Router = require('../Router').Router;
 
-describe('detour', function(){
+describe('Router', function(){
 
   var expectException = function(f, extype, exmessage, exdetail){
     try {
@@ -64,13 +64,13 @@ describe('detour', function(){
 
   describe('#name', function(){
     it ("throws an exception if the path doesn't exist", function(){
-        var d = new detour()
+        var d = new Router()
         expectException(function(){
           d.name('/', 'root')
         }, "PathDoesNotExist", "Cannot name a path that doesn't exist", "/")
     })
     it ("throws an exception if name starts with '/'", function(){
-        var d = new detour()
+        var d = new Router()
         expectException(function(){
           d.name('/', '/root')
         }, "InvalidName", 
@@ -78,7 +78,7 @@ describe('detour', function(){
             , {})
     })
     it ("allows a path to be set if it exists", function(){
-        var d = new detour()
+        var d = new Router()
         d.route('/', function(req, res){ res.send("hello world");});
         d.name('/', 'root')
     })
@@ -86,7 +86,7 @@ describe('detour', function(){
 
   describe('#as', function(){
     it ('names the given route', function(){
-        var d = new detour()
+        var d = new Router()
         d.route('/', function(req, res){ res.send("hello world");}).as("root");
         var url = d.getUrl("root")
         url.should.equal('/')
@@ -96,18 +96,18 @@ describe('detour', function(){
   describe('#pathVariables', function(){
     it ('returns an empty hash for a static route', function(){
       // d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
-      var d = new detour()
+      var d = new Router()
       d.route('/', function(req, res){ res.send("hello world");});
       _.keys(d.pathVariables('http://asdf.com/')).length.should.equal(0)
     })
     it ("throws an exception when the url doesn't route", function(){
-      var d = new detour()
+      var d = new Router()
       expectException(function(){
         d.pathVariables('http://asdf.com/')
       }, "NotFound", 'That route is unknown.', '/')
     })
     it ('returns a hash of vars for a star route', function(){
-      var d = new detour()
+      var d = new Router()
       d.route('/', function(req, res){ res.send("hello world");});
       d.route('/*onetwothreefour', function(req, res){ res.send("hello world");});
       d.route('/*onetwothreefour/asdf', function(req, res){ res.send("hello world");});
@@ -122,7 +122,7 @@ describe('detour', function(){
   describe('#shouldThrowExceptions', function(){
     describe('when set to true', function(){
       it ('throws an exception when the uri is too long', function(){
-        var d = new detour()
+        var d = new Router()
         d.shouldThrowExceptions = true;
         var simpleModule = this.simpleModule;
         var bigurl = "1"
@@ -138,7 +138,7 @@ describe('detour', function(){
         }
       })
       it ('throws an exception when the URI is not found', function(){
-        var d = new detour()
+        var d = new Router()
         d.shouldThrowExceptions = true;
         var req = {url : "http://asdf.com/", method : 'GET'}
         try {
@@ -150,7 +150,7 @@ describe('detour', function(){
         }
       });
       it ("throws an exception on 405s", function(){
-        var d = new detour()
+        var d = new Router()
         d.shouldThrowExceptions = true;
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
@@ -165,7 +165,7 @@ describe('detour', function(){
         }
       })
       it ("throws an exception on 500", function(){
-        var d = new detour()
+        var d = new Router()
         d.shouldThrowExceptions = true;
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
@@ -182,7 +182,7 @@ describe('detour', function(){
       })
 
       it ("throws an exception on 501s", function(){
-        var d = new detour()
+        var d = new Router()
         d.shouldThrowExceptions = true;
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
@@ -202,14 +202,14 @@ describe('detour', function(){
 	describe('#getHandler', function(){
     it ("when accessing an undefined url, throws an exception",
       function(){
-        var d = new detour()
+        var d = new Router()
         expectException(function(){
           d.getHandler('/')
         }, "404", "Not Found", "/")
       }
     )
     it ("when accessing a too-long url, throws an exception", function(){
-      var d = new detour()
+      var d = new Router()
       var simpleModule = this.simpleModule;
       var bigurl = "1"
       _.times(4097, function(){bigurl += '1';})
@@ -219,7 +219,7 @@ describe('detour', function(){
     })
     it ("when accessing a defined url, returns a handler",
       function(){
-        var d = new detour()
+        var d = new Router()
         d.route('/', function(req, res){ res.send("hello world");});
         var handler = d.getHandler('/')
         should.exist(handler.GET);
@@ -229,7 +229,7 @@ describe('detour', function(){
 
 	describe('#route', function(){
     it ("can route a function as a GET", function(){
-        var d = new detour()
+        var d = new Router()
         d.route('/', function(req, res){return "hello world";});
         var req = { url : "http://asdf.com/", method : "GET"}
         d.dispatch(req, this.res)
@@ -238,7 +238,7 @@ describe('detour', function(){
     })
 
     it ("can route an object with a GET", function(){
-        var d = new detour()
+        var d = new Router()
         d.route('/', { GET : function(req, res){return "hello world";}});
         var req = { url : "http://asdf.com/", method : "GET"}
         d.dispatch(req, this.res)
@@ -246,7 +246,7 @@ describe('detour', function(){
     })
 
     it ("throws an exception if you try to mount a url without a parent", function(){
-        var d = new detour()
+        var d = new Router()
         var simpleModule = this.simpleModule;
         expectException(
            function(){
@@ -259,7 +259,7 @@ describe('detour', function(){
     })
 
     it ("can add a route if the parent of the path exists", function(){
-        var d = new detour()
+        var d = new Router()
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
         d.route('/hello', { GET : function(req, res){res.end("hello world");}});
@@ -269,7 +269,7 @@ describe('detour', function(){
     });
 
     it ("can add a route to a non-root path that exists", function(){
-        var d = new detour()
+        var d = new Router()
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
         d.route('/hello/', { GET : function(req, res){res.send("hello world");}});
@@ -280,7 +280,7 @@ describe('detour', function(){
     });
 
     it ("can add a wildcard route", function(){
-        var d = new detour()
+        var d = new Router()
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
         d.route('/hello/', { GET : function(req, res){res.send("hello world");}});
@@ -291,7 +291,7 @@ describe('detour', function(){
     });
 
     it ("throws an exception if the module doesn't implement any methods", function(){
-        var d = new detour()
+        var d = new Router()
         expectException(
            function(){
              d.route('/', {})
@@ -306,26 +306,26 @@ describe('detour', function(){
 	describe('#getUrl', function(){
 
     it ("throws an error when the path doesn't exist", function(){
-        var d = new detour()
+        var d = new Router()
         expectException(function(){
           d.getUrl('/')
         }, 'NotFound', 'That route is unknown.', '/');
     });
     it ("throws an error when the name doesn't exist", function(){
-        var d = new detour()
+        var d = new Router()
         expectException(function(){
           d.getUrl('some_name')
         }, 'NotFound', 'That route name is unknown.', 'some_name');
     });
     it ("returns the url for static path as that static path", function(){
-        var d = new detour()
+        var d = new Router()
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
         var url = d.getUrl('/')
         url.should.equal('/')
     });
     it ("throws an error when the given var names are irrelevant", function(){
-        var d = new detour()
+        var d = new Router()
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
         expectException(function(){
@@ -335,7 +335,7 @@ describe('detour', function(){
             "asdf");
     });
     it ("throws an error when the given var names are insufficient", function(){
-        var d = new detour()
+        var d = new Router()
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
         d.route('/*asdf', simpleModule)
@@ -346,7 +346,7 @@ describe('detour', function(){
             "asdf");
     });
     it ("returns the url for a star path with variables injected", function(){
-        var d = new detour()
+        var d = new Router()
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
         d.route('/*asdf', simpleModule)
@@ -354,7 +354,7 @@ describe('detour', function(){
         url.should.equal('/1234')
     });
     it ("returns the url for a double star path with variables injected", function(){
-        var d = new detour()
+        var d = new Router()
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
         d.route('/*asdf', simpleModule)
@@ -364,7 +364,7 @@ describe('detour', function(){
         url.should.equal('/1234/sub/4567')
     })
     it ("returns the url for a NAMED double star path with variables injected", function(){
-        var d = new detour()
+        var d = new Router()
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule)
         d.route('/*asdf', simpleModule)
@@ -378,7 +378,7 @@ describe('detour', function(){
 
   describe('#connectMiddleware', function(){
     it ("is a function that plugs this into express in as middleware", function(){
-      var d = new detour()
+      var d = new Router()
       var called = false;
       d.dispatch = function(req, res, next){ called = true; }
       d.connectMiddleware({}, {}, function(){});
@@ -388,7 +388,7 @@ describe('detour', function(){
 
   describe('#before', function(){
     it ('allows middleware to be added to various paths', function(){
-      var d = new detour()
+      var d = new Router()
       d.route('/', { GET : function(req, res){res.end("GET");}}).as("index");
       d.route('/*sub', { GET : function(req, res){res.end("subGET");}});
       d.before(['/', '/*sub'], [function(req, res, next){
@@ -402,7 +402,7 @@ describe('detour', function(){
       this.res.body.should.equal("early out")
     })
     it ('allows middleware to be added to various paths and still routes', function(){
-      var d = new detour()
+      var d = new Router()
       var urls = [];
       d.route('/', { GET : function(req, res){res.end("GET");}}).as("index");
       d.route('/*sub', { GET : function(req, res){res.end("subGET");}});
@@ -425,18 +425,18 @@ describe('detour', function(){
 
   describe('#dispatch', function(){
 
-    it ("decorates every request object with the detour object as req.detour by default", 
+    it ("decorates every request object with the Router object as req.detour by default", 
         function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { POST : function(req, res){return "POST";}});
           var req = { url : "http://asdf.com/", method : "POST"}
           d.dispatch(req, this.res)
           should.exist(req.detour)
         }
     );
-    it ("decorates req with the detour object as req[d.requestNamespace]",
+    it ("decorates req with the Router object as req[d.requestNamespace]",
         function(){
-          var d = new detour()
+          var d = new Router()
           d.requestNamespace = "router"
           d.route('/', { POST : function(req, res){return "POST";}});
           var req = { url : "http://asdf.com/", method : "POST"}
@@ -446,14 +446,14 @@ describe('detour', function(){
     );
 
     it ("404s when it doesn't find a matching route and shouldHandle404s is true", function(){
-      var d = new detour()
+      var d = new Router()
       var req = {url : "http://asdf.com/", method : 'GET'}
       d.dispatch(req, this.res)
       this.res.status.should.equal(404)
       this.res.body.should.equal('')
     })
     it ("calls next() when it doesn't find a matching route and shouldHandle404s is false", function(){
-      var d = new detour()
+      var d = new Router()
       d.shouldHandle404s = false;
       var req = {url : "http://asdf.com/", method : 'GET'}
       var success = false;
@@ -464,7 +464,7 @@ describe('detour', function(){
     })
 
     it ("414s if the url is too long", function(){
-      var d = new detour()
+      var d = new Router()
       var simpleModule = this.simpleModule;
       var bigurl = "1"
       _.times(4097, function(){bigurl += '1';})
@@ -475,7 +475,7 @@ describe('detour', function(){
     })
 
     it ("405s on a resource-unsupported method", function(){
-      var d = new detour()
+      var d = new Router()
       var simpleModule = this.simpleModule;
       d.route('/', simpleModule)
       d.route('/hello', { GET : function(req, res){res.send("hello world");}});
@@ -485,7 +485,7 @@ describe('detour', function(){
       this.res.expectHeader('Allow', 'OPTIONS,GET,HEAD')
     })
     it ("500s on a directly thrown exception", function(){
-      var d = new detour()
+      var d = new Router()
       var simpleModule = this.simpleModule;
       d.route('/', simpleModule)
       d.route('/fail', { GET : function(req, res){ throw 'wthizzle';}});
@@ -495,7 +495,7 @@ describe('detour', function(){
     })
 
     it ("501s on a server-unsupported method", function(){
-      var d = new detour()
+      var d = new Router()
       var simpleModule = this.simpleModule;
       d.route('/', simpleModule)
       d.route('/hello', { GET : function(req, res){res.send("hello world");}});
@@ -504,7 +504,7 @@ describe('detour', function(){
       this.res.expectStatus(501)
     })
     it ("can route an object with a POST", function(){
-        var d = new detour()
+        var d = new Router()
         d.route('/', { POST : function(req, res){res.end("POST");}});
         var req = { url : "http://asdf.com/", method : "POST"}
         d.dispatch(req, this.res)
@@ -516,20 +516,20 @@ describe('detour', function(){
       // It should call resource's GET or collectionGET, strip the body, and
       // return the rest.
       it ("404s if the resource doesn't exist", function(){
-          var d = new detour()
+          var d = new Router()
           var req = { url : "http://asdf.com/asdf", method : "OPTIONS"}
           d.dispatch(req, this.res)
           this.res.expectStatus(404)
       });
       it ("405s if the resource has no GET", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { POST : function(req, res){return "POST";}});
           var req = { url : "http://asdf.com/", method : "HEAD"}
           d.dispatch(req, this.res)
           this.res.expectStatus(405)
       })
       it ("204s (no body) if the resource has a GET", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.setHeader("Content-Type", 'application/wth');
                               res.end("GET output");
@@ -550,13 +550,13 @@ describe('detour', function(){
 
     describe ("when the method is OPTIONS", function(){
       it ("404s if the resource doesn't exist", function(){
-          var d = new detour()
+          var d = new Router()
           var req = { url : "http://asdf.com/asdf", method : "OPTIONS"}
           d.dispatch(req, this.res)
           this.res.expectStatus(404)
       });
       it ("sets the proper headers for OPTIONS if the resource exists", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
                         }});
@@ -567,7 +567,7 @@ describe('detour', function(){
       })
     });
     it ("finds and runs a GET handler at a sub path", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
                         }});
@@ -591,14 +591,14 @@ describe('detour', function(){
 
 	describe('#getChildUrls', function(){
     it ("throws an exception when given url doesn't exist", function(){
-          var d = new detour()
+          var d = new Router()
           expectException(function(){
             d.getChildUrls('http://asdf.com');
           }, 'NotFound', 'That route is unknown.', '/');
 
     });
     it ("gets child urls for a parent path correctly", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
                         }});
@@ -612,7 +612,7 @@ describe('detour', function(){
           should.not.exist(urls['/asdf'])
     });
     it ("gets child urls for a parent path correctly when given just the path", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
                         }});
@@ -626,7 +626,7 @@ describe('detour', function(){
           should.not.exist(urls['/asdf'])
     });
     it ("gets multiple child urls for a parent path", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
                         }});
@@ -645,7 +645,7 @@ describe('detour', function(){
           should.not.exist(urls['/other'])
     });
     it ("doesn't get grandkids", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
                         }});
@@ -663,7 +663,7 @@ describe('detour', function(){
           should.not.exist(urls['/asdf'])
     });
     it ("doesn't get starRoutes", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
                         }});
@@ -676,7 +676,7 @@ describe('detour', function(){
     }); 
 
     it ("can get children of starRoutes", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
                         }}).as('root');
@@ -693,7 +693,7 @@ describe('detour', function(){
     });
 
     it ("populates the names of child routes where possible", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
                         }}).as('root');
@@ -711,7 +711,7 @@ describe('detour', function(){
     });
 
     it ("populates the names of child routes of starRoutes where possible", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
                         }}).as('root');
@@ -731,7 +731,7 @@ describe('detour', function(){
   });
 	describe('#getParentUrl', function(){
     it ("throws an exception when getting the parent url of a root node", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
                         }});
@@ -740,7 +740,7 @@ describe('detour', function(){
           }, 'NoParentUrl', 'The given path has no parent path', '/');
     });
     it ("returns the parent url for a child path correctly", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
                         }});
@@ -751,7 +751,7 @@ describe('detour', function(){
           url.should.equal('http://asdf.com')
     });
     it ("returns the parent url for a grandchild path correctly", function(){
-          var d = new detour()
+          var d = new Router()
           d.route('/', { GET : function(req, res){
                               res.end("GET output");
                         }});
