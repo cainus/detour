@@ -1,5 +1,6 @@
 var _ = require('underscore');
 var DetourError = require('./DetourError').DetourError;
+var FSRouteLoader = require('./FSRouteLoader').FSRouteLoader;
 var url = require('url');
 var serverSupportedMethods = ["GET", "POST", 
                               "PUT", "DELETE",
