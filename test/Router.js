@@ -737,6 +737,27 @@ describe('Router', function(){
     });
 
   });
+
+  describe('#getNamedChildUrls', function(){
+    var d = new Router()
+    d.route('/', { GET : function(req, res){
+                        res.end("GET output");
+                  }}).as('root');
+    d.route('/asdf', { GET : function(req, res){
+                        res.end("GET output");
+                  }}).as('asdf');
+    d.route('/qwerty', { GET : function(req, res){
+                        res.end("GET output");
+                  }});  // this one is not named
+    var urls = d.getNamedChildUrls('http://asdf.com/');
+    var keys = _.keys(urls);
+    keys.length.should.equal(1) 
+    keys[0].should.equal('/asdf');
+    urls['/asdf'].should.equal('asdf')
+    
+  });
+
+
 	describe('#getParentUrl', function(){
     it ("throws an exception when getting the parent url of a root node", function(){
           var d = new Router()
