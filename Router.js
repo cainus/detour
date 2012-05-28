@@ -190,7 +190,7 @@ Router.prototype.getChildUrls = function(urlStr){
 Router.prototype.getNamedChildUrls = function(urlStr){
  var urls = this.getChildUrls(urlStr);
  var namedurls = {};
- _.each(urls, function(v, k){ if (!!v){ namedurls[k] = v; }})
+ _.each(urls, function(v, k){ if (!!v){ namedurls[v] = k; }})
  return namedurls;
 }
 

@@ -752,8 +752,8 @@ describe('Router', function(){
     var urls = d.getNamedChildUrls('http://asdf.com/');
     var keys = _.keys(urls);
     keys.length.should.equal(1) 
-    keys[0].should.equal('/asdf');
-    urls['/asdf'].should.equal('asdf')
+    keys[0].should.equal('asdf');
+    urls['asdf'].should.equal('/asdf')
     
   });
 
