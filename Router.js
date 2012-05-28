@@ -1,4 +1,5 @@
 var _ = require('underscore');
+var events = require('events');
 var DetourError = require('./DetourError').DetourError;
 var FSRouteLoader = require('./FSRouteLoader').FSRouteLoader;
 var url = require('url');
@@ -8,6 +9,7 @@ var serverSupportedMethods = ["GET", "POST",
 
 
 function Router(){
+
   this.shouldHandle404s = true;
   this.shouldThrowExceptions = false;
   this.routes = {};
@@ -21,6 +23,7 @@ function Router(){
 
 }
 
+Router.prototype = Object.create(events.EventEmitter.prototype);
 
 // cb simply takes an err object.  It is called when the directory is done loading.
 Router.prototype.routeDirectory = function(dir, cb){
@@ -285,6 +288,7 @@ Router.prototype.route = function(path, handler){
     handler.OPTIONS = function(req, res){ that.handleOPTIONS(req, res); };
   }
 
+  this.emit("route", handler);
   if (isStarPath(path)){
     addStarRoute(this, path, { handler : handler, middlewares : []});
   } else {

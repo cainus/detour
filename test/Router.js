@@ -228,14 +228,22 @@ describe('Router', function(){
   });
 
 	describe('#route', function(){
+    it ("emits an event on every routed object", function(){
+      var d = new Router()
+      d.on("route", function(resource){
+        should.exist(resource.GET);
+        _.isFunction(resource.GET).should.equal(true)
+      });
+      d.route('/', function(req, res){return "hello world";});
+    });
+
     it ("can route a function as a GET", function(){
         var d = new Router()
         d.route('/', function(req, res){return "hello world";});
         var req = { url : "http://asdf.com/", method : "GET"}
         d.dispatch(req, this.res)
         this.res.expectEnd("hello world")
-
-    })
+    });
 
     it ("can route an object with a GET", function(){
         var d = new Router()
