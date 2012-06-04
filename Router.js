@@ -201,8 +201,7 @@ Router.prototype.getParentUrl = function(urlStr){
   }
   var pieces = path.split('/');
   pieces.pop();
-  var urlObj = url.parse(urlStr);
-  return  urlObj.protocol + '/' + urlJoin(urlObj.host, pieces);
+  return  urlJoin(pieces);
 };
 
 Router.prototype.getUrl = function(path, var_map){

@@ -754,7 +754,6 @@ describe('Router', function(){
     keys.length.should.equal(1) 
     keys[0].should.equal('asdf');
     urls['asdf'].should.equal('/asdf')
-    
   });
 
 
@@ -777,7 +776,18 @@ describe('Router', function(){
                               res.end("GET output");
                         }});
           var url = d.getParentUrl('http://asdf.com/asdf');
-          url.should.equal('http://asdf.com')
+          url.should.equal('/')
+    });
+    it ("returns the parent url for a child path correctly with just a path", function(){
+          var d = new Router()
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          d.route('/asdf', { GET : function(req, res){
+                              res.end("GET output");
+                        }});
+          var url = d.getParentUrl('/asdf');
+          url.should.equal('/')
     });
     it ("returns the parent url for a grandchild path correctly", function(){
           var d = new Router()
@@ -791,7 +801,7 @@ describe('Router', function(){
                               res.end("GET output");
                         }});
           var url = d.getParentUrl('http://asdf.com/asdf/grandkid');
-          url.should.equal('http://asdf.com/asdf')
+          url.should.equal('/asdf')
     });
 
   })
