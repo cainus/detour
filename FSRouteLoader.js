@@ -8,7 +8,7 @@ var FSRouteLoader = function(router, dir){
   this.requirer = new DirRequirer(dir);
   this.dir = dir;
   this.paths = [];
-}
+};
 
 FSRouteLoader.prototype.load = function(cb){
   var that = this;
@@ -23,19 +23,20 @@ FSRouteLoader.prototype.load = function(cb){
             'There was no _index.js at the given path.  This is the first necessary resource file.',
            that.dir));
     }
-    var remainingPaths = _.keys(that.paths)
+    var remainingPaths = _.keys(that.paths);
     var originalPaths = _.clone(remainingPaths);
-    var path = false;
-    while (path = bestPathsPop(remainingPaths)){
+    var path = bestPathsPop(remainingPaths);
+    while (path){
       try {
         routePath(that, path, originalPaths);
       } catch (ex){
         return cb(ex);
       }
-    };
+      path = bestPathsPop(remainingPaths);
+    }
     return cb();
   });
-}
+};
 
 
 var routePath = function(that, path, originalPaths){
@@ -52,7 +53,7 @@ var routePath = function(that, path, originalPaths){
     that.router.route(url, obj.module.handler).as(name);
     if (!!obj.module.member){
       var memberUrl = pathToStarChildRoute(url);
-      var name = name + '*';
+      name = name + '*';
       that.router.route(memberUrl, obj.module.member).as(name);
     }
   } else {
@@ -65,7 +66,7 @@ var routePath = function(that, path, originalPaths){
       );
     }
   }
-}
+};
 
 FSRouteLoader.prototype.autoName = function(path){
   if (path == '/_index.js'){
@@ -73,19 +74,19 @@ FSRouteLoader.prototype.autoName = function(path){
   } else {
     // TODO FIXME ugliest, dumbest thing ever (but it works)
     var name = path;
-    name = name.replace(/\/_[^\/]+/g, '*')  // replace /*whatever with *
-    name = name.replace(/\/_/g, '')         // remove leading underscores
-    name = name.replace(/\//g, '_')         // change / to _
-    name = name.replace(/\.js$/, '')        // remove .js extension
+    name = name.replace(/\/_[^\/]+/g, '*');  // replace /*whatever with *
+    name = name.replace(/\/_/g, '');         // remove leading underscores
+    name = name.replace(/\//g, '_');         // change / to _
+    name = name.replace(/\.js$/, '');        // remove .js extension
     if (name[0] == '_'){
-      name = name.substring(1)
+      name = name.substring(1);
     }
-    name = name.replace(/_\*[^_]+_/, '*')        // replace * routes with just *
-    name = name.replace(/\*_/, '*')        // replace * routes with just *
-    var name = camelCase(name);
+    name = name.replace(/_\*[^_]+_/, '*');        // replace * routes with just *
+    name = name.replace(/\*_/, '*');        // replace * routes with just *
+    name = camelCase(name);
     return name;
   }
-}
+};
 
 exports.FSRouteLoader = FSRouteLoader;
 
@@ -93,21 +94,21 @@ var arrayRemove = function(arr, val){
 
   var index = arr.indexOf(val);
   if (index != -1){
-    arr.splice(index, 1)
+    arr.splice(index, 1);
     return val;
   }
 
-}
+};
 
 
 var bestPathsPop = function(paths){
   var leastSlashes = -1;
-  var shortestPaths = []
+  var shortestPaths = [];
   var root = arrayRemove(paths, '/_index.js');
   if (!!root) { return root;}
 
   _.each(paths, function(path){
-    var slashCount = path.split('/').length
+    var slashCount = path.split('/').length;
     if ((leastSlashes === -1) || (leastSlashes > slashCount)){
       leastSlashes = slashCount;
       shortestPaths = [path];
@@ -120,7 +121,7 @@ var bestPathsPop = function(paths){
 
   var path = arrayRemove(paths, shortestPaths[0]);
   return path;
-}
+};
 
 var urlJoin = function(){
 	// put a fwd-slash between all pieces and remove any redundant slashes
@@ -134,11 +135,11 @@ var urlJoin = function(){
 
 // takes a path and returns the path of a starRoute under it.
 var pathToStarChildRoute = function(path){
-  var path = path.replace(/\.js$/g, '');  // remove .js
+  path = path.replace(/\.js$/g, '');  // remove .js
   var pieces = path.split('/');
   var parent = pieces.pop();
   return urlJoin(pieces, parent, '*' + parent);
-}
+};
 
 // checks to see if a given module is in the same dir as a dynamic path module.
 var hasDynamicSibling = function(path, paths){
@@ -149,7 +150,7 @@ var hasDynamicSibling = function(path, paths){
   if (filename === dynamicFileName){return false;}
   var dynamic = urlJoin(pieces, parent, dynamicFileName);
   return _.include(paths, dynamic);
-}
+};
 
 
 function endsWith(str, suffix) {
@@ -171,12 +172,12 @@ var pathToUriPath = function(path){
     });
     path = urlJoin(pieces);
     return truncate(path, 3);
-  };
-}
+  }
+};
 
 var truncate = function(str, count){
-  return str.substring(0, str.length - count)
-}
+  return str.substring(0, str.length - count);
+};
 
 var camelCase = function(str){
 	return str.replace(/(_[a-z])/g, function($1){return $1.toUpperCase().replace('_','');});

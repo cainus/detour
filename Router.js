@@ -8,8 +8,9 @@ var serverSupportedMethods = ["GET", "POST",
                               "HEAD", "OPTIONS"];
 
 
-function Router(){
-
+function Router(path){
+  this.path = path || '/';
+  this.path = urlJoin(this.path);
   this.shouldHandle404s = true;
   this.shouldThrowExceptions = false;
   this.routes = {};
@@ -26,10 +27,10 @@ function Router(){
 Router.prototype = Object.create(events.EventEmitter.prototype);
 
 // cb simply takes an err object.  It is called when the directory is done loading.
-Router.prototype.routeDirectory = function(dir, cb){
-  this.loader = new FSRouteLoader(this, dir);
+Router.prototype.routeDirectory = function(path, dir, cb){
+  this.loader = new FSRouteLoader(this, path, dir);
   this.loader.load(cb);
-}
+};
 
 // given a url, return the handler object for it
 Router.prototype.getHandler = function(url){
@@ -141,17 +142,18 @@ var getMatchingRoutePaths = function(that, urlStr, pathVars){
   var starPath = isStarPath(path);
   var paths;
   if (starPath){
-    paths = _.pluck(that.starRoutes, "path")
+    paths = _.pluck(that.starRoutes, "path");
   } else {
     paths = _.keys(that.routes);
   }
   _.each(paths, function(pathStr){
     if (pathStr != path && startsWith(pathStr, path)){
       if ((removePrefix(pathStr, path).substring(1).indexOf("/")) === -1){
+        var url;
         if (starPath){
-          var url = that.getUrl(pathStr, pathVars);
+          url = that.getUrl(pathStr, pathVars);
         } else {
-          var url = pathStr;
+          url = pathStr;
         }
         var kid;
         if (!!urlObj.protocol && !!urlObj.host){
@@ -164,16 +166,16 @@ var getMatchingRoutePaths = function(that, urlStr, pathVars){
     }
   });
   return matchingPaths;
-}
+};
 
 Router.prototype.getChildUrls = function(urlStr){
   var pathVars = this.pathVariables(urlStr);
   var that = this;
   var matchingPaths = getMatchingRoutePaths(that, urlStr, pathVars);
-  var urlObj = {}
+  var urlObj = {};
   _.each(matchingPaths, function(path){
     var pathonly = getPath(path);
-    var pathonly = that.getUrl(pathonly, pathVars)
+    pathonly = that.getUrl(pathonly, pathVars);
     try {
       urlObj[pathonly] = pathToName(that, path);
     } catch(ex) {
@@ -188,11 +190,11 @@ Router.prototype.getChildUrls = function(urlStr){
 };
 
 Router.prototype.getNamedChildUrls = function(urlStr){
- var urls = this.getChildUrls(urlStr);
- var namedurls = {};
- _.each(urls, function(v, k){ if (!!v){ namedurls[v] = k; }})
- return namedurls;
-}
+  var urls = this.getChildUrls(urlStr);
+  var namedurls = {};
+  _.each(urls, function(v, k){ if (!!v){ namedurls[v] = k; }});
+  return namedurls;
+};
 
 Router.prototype.getParentUrl = function(urlStr){
   var path = getInputPath(this, urlStr);
@@ -261,9 +263,9 @@ Router.prototype.route = function(path, handler){
         '');
   }
 
-  path = urlJoin(path);
+  path = urlJoin(this.path, path);
 
-  if (!isRootPath(path) && !hasParent(this, path)){
+  if (!this.isRootPath(path) && !hasParent(this, path)){
     throw new DetourError('ParentDoesNotExist',
       "The route you're trying to add does not have a parent route defined.", 
       path);
@@ -375,17 +377,21 @@ Router.prototype.name = function(path, name){
   this.names[name] = path;
 };
 
+Router.prototype.isRootPath = function(url){
+  url = urlJoin(url);
+  return url == this.path;
+};
 
 exports.Router = Router;
 
 var executeMiddleware = function(middlewares, req, res, done){
-  var mIndex = -1;
+  var middlewareIndex = -1;
   var next = function(err){
-    mIndex++;
+    middlewareIndex++;
     if (err){
       return done(err);
     } else {
-      var m = middlewares[mIndex];
+      var m = middlewares[middlewareIndex];
       if (!!m){
         return m(req, res, next);
       } else {
@@ -467,7 +473,7 @@ var findStarRoute = function(d, path){
     return route;
   }
   throw DetourError('NotFound', 'That route is unknown.', "" + path);
-}
+};
 
 var addStarRoute = function(d, path, route){
   var escapeSlashes = function(str){
@@ -484,10 +490,6 @@ var addStarRoute = function(d, path, route){
 };
 
 
-var isRootPath = function(url){
-  url = urlJoin(url);
-  return url == "/";
-};
 
 
 
@@ -519,7 +521,7 @@ var pathToName = function(d, inpath){
     });
     if (outname === null){ throw "NotFound"; }
     return outname;
-}
+};
 
 var pathIfName = function(d, path){
     if (path[0] != '/') {
