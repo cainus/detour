@@ -27,8 +27,8 @@ function Router(path){
 Router.prototype = Object.create(events.EventEmitter.prototype);
 
 // cb simply takes an err object.  It is called when the directory is done loading.
-Router.prototype.routeDirectory = function(path, dir, cb){
-  this.loader = new FSRouteLoader(this, path, dir);
+Router.prototype.routeDirectory = function(dir, cb){
+  this.loader = new FSRouteLoader(this, dir);
   this.loader.load(cb);
 };
 
