@@ -422,7 +422,8 @@ var urlJoin = function(){
 };
 
 var getPath = function(urlstr){
-  return urlJoin(url.parse(urlstr).path);
+  var path = url.parse(urlstr).pathname;
+  return urlJoin(url.parse(urlstr).pathname);
 };
 
 var getInputPath = function(d, url){

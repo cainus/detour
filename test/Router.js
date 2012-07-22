@@ -233,6 +233,12 @@ describe('Router', function(){
         should.exist(handler.GET);
       }
     );
+    it ("when accessing a defined url with a querystring, returns a handler", function(){
+        var d = new Router();
+        d.route('/', function(req, res){ res.send("hello world");});
+        var handler = d.getHandler('/?asdf=1234');
+        should.exist(handler.GET);
+    });
   });
 
 	describe('#route', function(){
@@ -525,6 +531,13 @@ describe('Router', function(){
         var req = { url : "http://asdf.com/", method : "POST"};
         d.dispatch(req, this.res);
         this.res.expectEnd("POST");
+    });
+    it ("can dispatch a url with a querystring", function(){
+        var d = new Router();
+        d.route('/', { GET : function(req, res){res.end("GET");}});
+        var req = { url : "http://asdf.com/?asdf=1234", method : "GET"};
+        d.dispatch(req, this.res);
+        this.res.expectEnd("GET");
     });
 
     describe("when the method is HEAD", function(){
