@@ -70,6 +70,19 @@ describe('Router', function(){
                                   };
 	});
 
+  describe('#onRequest', function(){
+    it ("can be overridden to decorate the resource object", function(){
+        var d = new Router('/api');
+        d.onRequest = function(resource, req, res){
+          resource.url = req.url;
+        };
+        d.route('/', {GET : function(req, res){res.end("hello world: " + this.url);}});
+        var req = { url : "http://asdf.com/api", method : "GET"};
+        d.dispatch(req, this.res);
+        this.res.expectEnd("hello world: http://asdf.com/api");
+    });
+  });
+
   describe('#name', function(){
     it ("throws an exception if the path doesn't exist", function(){
         var d = new Router();

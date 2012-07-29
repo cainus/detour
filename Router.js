@@ -75,9 +75,14 @@ Router.prototype.pathVariables = function(url){
 };
 
 
+Router.prototype.onRequest = function(handler, req, res){
+  // do nothing by default
+  // can be overridden though
+};
 
 Router.prototype.dispatch = function(req, res, next){
   req[this.requestNamespace] = this;
+  var that = this;
   var handler, route;
   try {
     route = this.getRoute(req.url);
@@ -123,7 +128,7 @@ Router.prototype.dispatch = function(req, res, next){
   try {
     executeMiddleware(route.middlewares, req, res, function(err){
       if (err) throw err;
-      return handler[method](req, res);
+      return handle(that, handler, method, req, res);
     });
   } catch(ex){
     if (this.shouldThrowExceptions){ 
@@ -134,6 +139,15 @@ Router.prototype.dispatch = function(req, res, next){
   }
 };
 
+var handle = function(router, handler, method, req, res){
+  var handlerObj = _.clone(handler);
+  try {
+  router.onRequest(handlerObj, req, res);
+  } catch(ex){
+    console.log(ex);
+  }
+  return handlerObj[method](req, res);
+};
 
 var getMatchingRoutePaths = function(that, urlStr, pathVars){
   var matchingPaths = [];
@@ -354,7 +368,7 @@ Router.prototype.handleHEAD = function(req, res){
     return this.handle405(req, res);
   }
   res.writeHead(204);
-  handler.GET(req, res);
+  handle(this, handler, 'GET', req, res);
 };
 
 
