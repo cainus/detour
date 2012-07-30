@@ -73,8 +73,9 @@ describe('Router', function(){
   describe('#onRequest', function(){
     it ("can be overridden to decorate the resource object", function(){
         var d = new Router('/api');
-        d.onRequest = function(resource, req, res){
+        d.onRequest = function(resource, req, res, cb){
           resource.url = req.url;
+          cb(null, resource);
         };
         d.route('/', {GET : function(req, res){res.end("hello world: " + this.url);}});
         var req = { url : "http://asdf.com/api", method : "GET"};

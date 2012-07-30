@@ -75,9 +75,10 @@ Router.prototype.pathVariables = function(url){
 };
 
 
-Router.prototype.onRequest = function(handler, req, res){
+Router.prototype.onRequest = function(handler, req, res, cb){
   // do nothing by default
   // can be overridden though
+  cb(null, handler);
 };
 
 Router.prototype.dispatch = function(req, res, next){
@@ -141,12 +142,9 @@ Router.prototype.dispatch = function(req, res, next){
 
 var handle = function(router, handler, method, req, res){
   var handlerObj = _.clone(handler);
-  try {
-  router.onRequest(handlerObj, req, res);
-  } catch(ex){
-    console.log(ex);
-  }
-  return handlerObj[method](req, res);
+  router.onRequest(handlerObj, req, res, function(err, newHandlerObj){
+    return newHandlerObj[method](req, res);
+  });
 };
 
 var getMatchingRoutePaths = function(that, urlStr, pathVars){
