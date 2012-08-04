@@ -64,10 +64,6 @@ describe('Router', function(){
 	beforeEach(function(){
     this.res = new FakeRes();
     this.simpleModule = {GET : function(req, res){res.send("OK");}};
-    this.simpleCollectionModule = {  
-                                    GET : function(req, res){res.send("OK");},
-                                    collectionGET : function(req, res){res.send("OK");}
-                                  };
 	});
 
   describe('#onRequest', function(){
@@ -556,8 +552,6 @@ describe('Router', function(){
 
     describe("when the method is HEAD", function(){
       // HEAD is the same as GET, but without a response body
-      // It should call resource's GET or collectionGET, strip the body, and
-      // return the rest.
       it ("404s if the resource doesn't exist", function(){
           var d = new Router();
           var req = { url : "http://asdf.com/asdf", method : "OPTIONS"};

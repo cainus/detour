@@ -276,6 +276,37 @@ describe('FSRouteLoader', function(){
       });
     });
 
+    it ("can route a collection module from the root", function(done){
+
+      this.loader.requirer.require = function(cb){
+        this.paths = {
+                      '/_index.js' :  {module : {
+                                                    handler :
+                                                        {GET : function(req, res){
+                                                                  res.end('collection');
+                                                               }
+                                                        },
+                                                    member :
+                                                        {GET : function(req, res){
+                                                                  res.end('member');
+                                                               }
+                                                        }
+                                                  },
+                                                  type : 'file',
+                                                  fullpath : '/asdf/song.js'
+                                              }
+                                            };
+        cb();
+      };
+      var that = this;
+      this.loader.load(function(err){
+        should.not.exist(err);
+        that.router.getUrl('root').should.equal('/');
+        that.router.getUrl('/*root', {root : 1234}).should.equal('/1234');
+        done();
+      });
+    });
+
     it ("can nest collection modules", function(done){
 
       this.loader.requirer.require = function(cb){
@@ -331,6 +362,56 @@ describe('FSRouteLoader', function(){
                             .should.equal('/artist/1234/song/5678');
         that.router.getUrl('artist*song*', {artist : 1234, song : 5678})
                             .should.equal('/artist/1234/song/5678');
+        done();
+      });
+    });
+    it ("can route a module below a root collection module", function(done){
+
+      this.loader.requirer.require = function(cb){
+        this.paths = {
+                      '/_index.js' :  {module : {
+                                                    handler :
+                                                        {GET : function(req, res){
+                                                                  res.end('collection');
+                                                               }
+                                                        },
+                                                    member :
+                                                        {GET : function(req, res){
+                                                                  res.end('member');
+                                                               }
+                                                        }
+                                                  },
+                                                  type : 'file',
+                                                  fullpath : '/asdf/song.js'
+                                              },
+                      '/*root/artist.js' :
+                        {module : { 
+                            handler : 
+                                {GET : function(req, res){
+                                          res.end('artist collection');
+                                       }
+                                },
+                            member :
+                                {GET : function(req, res){
+                                          res.end('artist member');
+                                       }
+                                }
+                          },
+                          type : 'file',
+                          fullpath : '/_root/artist.js'
+                      }
+
+
+                                            };
+        cb();
+      };
+      var that = this;
+      this.loader.load(function(err){
+        should.not.exist(err);
+        that.router.getUrl('root').should.equal('/');
+        that.router.getUrl('/*root', {root : 1234}).should.equal('/1234');
+        that.router.getUrl('/*root/artist', {root : 1234}).should.equal('/1234/artist');
+        that.router.getUrl('/*root/artist/*artist', {root : 1234, artist : 5678}).should.equal('/1234/artist/5678');
         done();
       });
     });

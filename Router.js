@@ -482,6 +482,15 @@ var findStarRoute = function(d, path){
   var route = _.find(d.starRoutes, function(route){
     return !!path.match(route.regex);
   });
+  // special case for collections at the root
+  var rootcollection = '/*';
+  if (path === '/*root') { path = rootcollection; }
+  if (path === rootcollection){
+    route = _.find(d.starRoutes, function(route){
+      var found = (rootcollection === route.path);
+      return found;
+    });
+  }
   if (!!route && !!route.handler){
     return route;
   }
@@ -553,6 +562,9 @@ var pathVariableNames = function(route){
   }
   var varnames = route.path.match(/\*([^\/]+)/g);
   varnames = _.map(varnames, function(name){return name.substring(1);});
+  if (route.path === '/*'){
+    varnames.push('root');
+  }
   return varnames;
 };
 
