@@ -412,6 +412,9 @@ describe('FSRouteLoader', function(){
         that.router.getUrl('/*root', {root : 1234}).should.equal('/1234');
         that.router.getUrl('/*root/artist', {root : 1234}).should.equal('/1234/artist');
         that.router.getUrl('/*root/artist/*artist', {root : 1234, artist : 5678}).should.equal('/1234/artist/5678');
+        should.exist(that.router.getRoute('/'));
+        should.exist(that.router.getRoute('/1234/artist'));
+        should.exist(that.router.getRoute('/thisIsATest'));
         done();
       });
     });

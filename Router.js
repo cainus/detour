@@ -483,14 +483,6 @@ var findStarRoute = function(d, path){
     return !!path.match(route.regex);
   });
   // special case for collections at the root
-  var rootcollection = '/*';
-  if (path === '/*root') { path = rootcollection; }
-  if (path === rootcollection){
-    route = _.find(d.starRoutes, function(route){
-      var found = (rootcollection === route.path);
-      return found;
-    });
-  }
   if (!!route && !!route.handler){
     return route;
   }
@@ -498,6 +490,9 @@ var findStarRoute = function(d, path){
 };
 
 var addStarRoute = function(d, path, route){
+  if (path === '/*'){
+    path = '/*root';
+  }
   var escapeSlashes = function(str){
     return;
   };
