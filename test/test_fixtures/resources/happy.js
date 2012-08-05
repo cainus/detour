@@ -1,9 +1,5 @@
 
-var resource = require('../../../lib/resource').resource;
-
-console.log(resource);
-
-exports.handler = new resource({
+exports.handler = {
 
   GET : function(req, res){
     console.log("HERE!!!!!!!!!!!!!!!");
@@ -13,4 +9,4 @@ exports.handler = new resource({
   }
 
 
-});
+};
