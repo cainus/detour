@@ -6,6 +6,8 @@ var url = require('url');
 var serverSupportedMethods = ["GET", "POST", 
                               "PUT", "DELETE",
                               "HEAD", "OPTIONS"];
+var RouteTree = require('./RouteTree').RouteTree;
+
 
 
 function Router(path){
@@ -13,8 +15,8 @@ function Router(path){
   this.path = urlJoin(this.path);
   this.shouldHandle404s = true;
   this.shouldThrowExceptions = false;
+  this.routeTree = new RouteTree(path);
   this.routes = {};
-  this.starRoutes = [];
   this.names = {};
   this.requestNamespace = 'detour';  // req.detour will have this object
   var that = this;
@@ -34,37 +36,28 @@ Router.prototype.routeDirectory = function(dir, cb){
 
 // given a url, return the handler object for it
 Router.prototype.getHandler = function(url){
-  var route = this.getRoute(url);
-  if (!!route.handler){
-    return route.handler;
-  }
-  throw new DetourError('404', 'Not Found', "" + url);
-};
-
-Router.prototype.getRoute = function(url){
-  if (url.length > 4096){
-    throw new DetourError('414', 'Request-URI Too Long');
-  }
-  var path = getPath(url);
-  if (!!this.routes[path] && !!this.routes[path].handler){
-    return this.routes[path];
-  }
-  // check the starRoutes if it's not static...
+  var route;
+  var newex;
   try {
-    return findStarRoute(this, path);
-  } catch (ex) {
-    if (!!ex.name && ex.name == 'NotFound'){
-      throw new DetourError('404', 'Not Found', "" + url);
-    } else {
-      throw ex;
-    }
+    route = this.routeTree.get(url);
+  } catch(ex){
+      switch(ex){
+        case "Not Found" :
+          throw new DetourError('404', 'Not Found', "" + url);
+        case "URI Too Long" :
+          newex = new DetourError('414', 'Request-URI Too Long');
+          throw newex;
+        default :
+          throw ex;
+     }
   }
+  return route.handler;
 };
 
 // get the variables pulled out of a star route
 Router.prototype.pathVariables = function(url){
   var path = getPath(url);
-  var route = getUrlRoute(this, path);
+  var route = this.routeTree.getUrlRoute(path);
   var varnames = pathVariableNames(route);
   var matches = path.match(route.regex);
   var retval = {};
@@ -84,22 +77,32 @@ Router.prototype.onRequest = function(handler, req, res, cb){
 Router.prototype.dispatch = function(req, res, next){
   req[this.requestNamespace] = this;
   var that = this;
-  var handler, route;
+  var handler;
+  var route;
   try {
-    route = this.getRoute(req.url);
+    route = this.routeTree.get(req.url);
   } catch (ex){
     if (this.shouldThrowExceptions){
-      throw ex;
+      var newex;
+      switch(ex){
+        case "Not Found" :
+          throw new DetourError('404', 'Not Found', "" + url);
+        case "URI Too Long" :
+          newex = new DetourError('414', 'Request-URI Too Long');
+          throw newex;
+        default :
+          throw ex;
+      }
     }
-    switch(ex.name){
-      case "404" :
+    switch(ex){
+      case "Not Found" :
         if (this.shouldHandle404s){
           return this.handle404(req, res);
         } else {
           return next();
         }
         break;
-      case "414" :
+      case "URI Too Long" :
         return this.handle414(req, res);
       default :
         throw ex;
@@ -149,15 +152,10 @@ var handle = function(router, handler, method, req, res){
 
 var getMatchingRoutePaths = function(that, urlStr, pathVars){
   var matchingPaths = [];
-  var path = getInputPath(that, urlStr);
+  var path = that.routeTree.getUrlRoute(urlStr).path;
   var urlObj = url.parse(urlStr);
-  var starPath = isStarPath(path);
-  var paths;
-  if (starPath){
-    paths = _.pluck(that.starRoutes, "path");
-  } else {
-    paths = _.keys(that.routes);
-  }
+  var starPath = that.routeTree.isStarPath(path);
+  var paths = that.routeTree.getPaths(urlStr, pathVars);
   _.each(paths, function(pathStr){
     if (pathStr != path && startsWith(pathStr, path)){
       if ((removePrefix(pathStr, path).substring(1).indexOf("/")) === -1){
@@ -209,7 +207,7 @@ Router.prototype.getNamedChildUrls = function(urlStr){
 };
 
 Router.prototype.getParentUrl = function(urlStr){
-  var path = getInputPath(this, urlStr);
+  var path = this.routeTree.getUrlRoute(urlStr).path;
   if (path == '/'){
     throw new DetourError('NoParentUrl', 'The given path has no parent path', '/');
   }
@@ -223,7 +221,7 @@ Router.prototype.getUrl = function(path, var_map){
   path = pathIfName(this, path);
 
   var_map = var_map || {};
-  var route = getUrlRoute(this, path);
+  var route = this.routeTree.getUrlRoute(path);
   var varnames = pathVariableNames(route);
   for(var varname in var_map){
     if (!_.include(varnames, varname)){
@@ -259,7 +257,7 @@ Router.prototype.before = function(paths, middlewares){
   _.each(paths, function(path){
     // validate the path
     path = pathIfName(that, path);
-    var route = that.getRoute(path);
+    var route = that.routeTree.get(path);
     // push each middleware onto its middleware array
     _.each(middlewares, function(m){
       route.middlewares.push(m);
@@ -276,12 +274,6 @@ Router.prototype.route = function(path, handler){
   }
 
   path = urlJoin(this.path, path);
-
-  if (!this.isRootPath(path) && !hasParent(this, path)){
-    throw new DetourError('ParentDoesNotExist',
-      "The route you're trying to add does not have a parent route defined.", 
-      path);
-  }
 
   if (_.isFunction(handler)){
     // if it's a function, assume it's for GET
@@ -307,12 +299,9 @@ Router.prototype.route = function(path, handler){
     handler.OPTIONS = function(req, res){ that.handleOPTIONS(req, res); };
   }
 
+  this.routeTree.set(path, handler);
+
   this.emit("route", handler);
-  if (isStarPath(path)){
-    addStarRoute(this, path, { handler : handler, middlewares : []});
-  } else {
-    this.routes[path] = { handler : handler, middlewares : []};
-  }
 
   // A call to route() will return an object with a function 'as' for
   // naming the route. eg: d.route('/', handler).as('index')
@@ -377,7 +366,7 @@ Router.prototype.name = function(path, name){
                "");
   }
   try {
-    path = getInputPath(this, path);
+    path = this.routeTree.getUrlRoute(path).path;
   } catch(ex) {
     if (ex.name == "NotFound"){
     throw new DetourError("PathDoesNotExist", 
@@ -387,11 +376,6 @@ Router.prototype.name = function(path, name){
     throw ex;
   }
   this.names[name] = path;
-};
-
-Router.prototype.isRootPath = function(url){
-  url = urlJoin(url);
-  return url == this.path;
 };
 
 exports.Router = Router;
@@ -438,31 +422,6 @@ var getPath = function(urlstr){
   return urlJoin(url.parse(urlstr).pathname);
 };
 
-var getInputPath = function(d, url){
-  var path = getPath(url);
-  if (!!d.routes[path] && !!d.routes[path].handler){
-    return path;
-  }
-  // check the starRoutes if it's not static...
-  return findStarRoute(d, path).path;
-};
-
-// Given a url get the route object that matches it.
-// A route object will either look like:
-// {path : '/asdf', handler : {some object}}
-//   OR
-// {path : '/asdf/*asdf', handler : {some object}, regex : /asdf/[^/]}
-// where the first case is a static route, and the second case is a
-// star route.
-var getUrlRoute = function(d, url){
-  var path = getPath(url);
-  if (!!d.routes[path] && !!d.routes[path].handler){
-    return {path : path, handler : d.routes[path].handler};
-  }
-  // check the starRoutes if it's not static...
-  return findStarRoute(d, path);
-};
-
 var handlerHasHttpMethods = function(handler){
   var methods = getMethods(handler);
   return methods.length > 0;
@@ -472,58 +431,6 @@ var getMethods = function(handler){
   var moduleMethods = _.functions(handler);
   var retval = _.intersection(moduleMethods, serverSupportedMethods);
   return retval;
-};
-
-var isStarPath = function(path){
-  return !!~path.indexOf("/*");
-};
-
-var findStarRoute = function(d, path){
-  var route = _.find(d.starRoutes, function(route){
-    return !!path.match(route.regex);
-  });
-  // special case for collections at the root
-  if (!!route && !!route.handler){
-    return route;
-  }
-  throw DetourError('NotFound', 'That route is unknown.', "" + path);
-};
-
-var addStarRoute = function(d, path, route){
-  if (path === '/*'){
-    path = '/*root';
-  }
-  var escapeSlashes = function(str){
-    return;
-  };
-  // change path to a regex
-  var reStr = path.replace(/\//g, '\\/');
-  // change *paths to match a non-slash
-  reStr = "^" + reStr.replace(/\*[^\/]+/g, "([^/]+)") + "$";
-  var re = new RegExp(reStr);
-  route.regex = re;
-  route.path = path;
-  d.starRoutes.push(route);
-};
-
-
-
-
-
-var hasParent = function(d, url){
-  var pieces = urlJoin(url).split("/");
-  pieces = _.filter(pieces, function(piece){return piece !== '';});
-  pieces.pop();
-  var parent = urlJoin(pieces);
-  try {
-    var route = d.getHandler(parent);
-    return true;
-  } catch (ex) {
-    if (ex.name == "404"){
-      return false;
-    }
-    throw ex;
-  }
 };
 
 
