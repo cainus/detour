@@ -308,6 +308,9 @@ describe('FSRouteLoader', function(){
     });
 
     it ("can nest collection modules", function(done){
+      this.router = new Router("/sub");  // set the router's path.  this is key.
+      this.dir = __dirname + '/test_fixtures/resources';
+      this.loader = new FSRouteLoader(this.router, this.dir);
 
       this.loader.requirer.require = function(cb){
         this.paths = {
@@ -350,23 +353,22 @@ describe('FSRouteLoader', function(){
       var that = this;
       this.loader.load(function(err){
         should.not.exist(err);
-        that.router.getUrl('root').should.equal('/');
-        that.router.getUrl('artist').should.equal('/artist');
-        that.router.getUrl('/artist/*artist', {artist : 1234}).should.equal('/artist/1234');
-        that.router.getUrl('artist*', {artist : 1234}).should.equal('/artist/1234');
-        that.router.getUrl('/artist/*artist/song', {artist : 1234})
-                            .should.equal('/artist/1234/song');
+        that.router.getUrl('root').should.equal('/sub');
+        that.router.getUrl('artist').should.equal('/sub/artist');
+        that.router.getUrl('/sub/artist/*artist', {artist : 1234}).should.equal('/sub/artist/1234');
+        that.router.getUrl('artist*', {artist : 1234}).should.equal('/sub/artist/1234');
+        that.router.getUrl('/sub/artist/*artist/song', {artist : 1234})
+                            .should.equal('/sub/artist/1234/song');
         that.router.getUrl('artist*song', {artist : 1234})
-                            .should.equal('/artist/1234/song');
-        that.router.getUrl('/artist/*artist/song/*song', {artist : 1234, song : 5678})
-                            .should.equal('/artist/1234/song/5678');
+                            .should.equal('/sub/artist/1234/song');
+        that.router.getUrl('/sub/artist/*artist/song/*song', {artist : 1234, song : 5678})
+                            .should.equal('/sub/artist/1234/song/5678');
         that.router.getUrl('artist*song*', {artist : 1234, song : 5678})
-                            .should.equal('/artist/1234/song/5678');
+                            .should.equal('/sub/artist/1234/song/5678');
         done();
       });
     });
     it ("can route a module below a root collection module", function(done){
-
       this.loader.requirer.require = function(cb){
         this.paths = {
                       '/_index.js' :  {module : {
@@ -400,9 +402,7 @@ describe('FSRouteLoader', function(){
                           type : 'file',
                           fullpath : '/asdf/_index/artist.js'
                       }
-
-
-                                            };
+                    };
         cb();
       };
       var that = this;
@@ -414,11 +414,49 @@ describe('FSRouteLoader', function(){
         that.router.getUrl('/*root/artist/*artist', {root : 1234, artist : 5678}).should.equal('/1234/artist/5678');
         should.exist(that.router.getHandler('/'));
         should.exist(that.router.getHandler('/1234/artist'));
+        should.exist(that.router.getHandler('/1234/artist/9876'));
         should.exist(that.router.getHandler('/thisIsATest'));
         done();
       });
     });
 
+    it ("can route a root collection when the router's path is set", function(done){
+      this.router = new Router("/sub");  // set the router's path.  this is key.
+      this.dir = __dirname + '/test_fixtures/resources';
+      this.loader = new FSRouteLoader(this.router, this.dir);
+      this.loader.requirer.require = function(cb){
+        this.paths = {
+                      '/_index.js' :  
+                        {
+                          module : {
+                              handler : {
+                                GET : function(req, res){
+                                  res.end('collection');
+                                }
+                              },
+                              member : {
+                                GET : function(req, res){
+                                  res.end('member');
+                                }
+                              }
+                              },
+                          type : 'file',
+                          fullpath : '/asdf/_index.js'
+                        }
+                      };
+        cb();
+      };
+      var that = this;
+      this.loader.load(function(err){
+        should.not.exist(err);
+        that.router.getUrl('root').should.equal('/sub');
+        that.router.getUrl('/sub/*root', {root : 1234}).should.equal('/sub/1234');
+        should.exist(that.router.getHandler('/sub'));
+        should.exist(that.router.getHandler('/sub/1234/'));
+        should.exist(that.router.getHandler('/sub/thisIsATest'));
+        done();
+      });
+    });
   });
 
 

@@ -369,9 +369,9 @@ Router.prototype.name = function(path, name){
     path = this.routeTree.getUrlRoute(path).path;
   } catch(ex) {
     if (ex.name == "NotFound"){
-    throw new DetourError("PathDoesNotExist", 
+      throw new DetourError("PathDoesNotExist", 
                 "Cannot name a path that doesn't exist",
-               "/");
+                {path : path, name : name});
     }
     throw ex;
   }

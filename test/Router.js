@@ -85,7 +85,9 @@ describe('Router', function(){
         var d = new Router();
         expectException(function(){
           d.name('/', 'root');
-        }, "PathDoesNotExist", "Cannot name a path that doesn't exist", "/");
+        }, "PathDoesNotExist", 
+            "Cannot name a path that doesn't exist", 
+            {"path":"/", "name":"root"});
     });
     it ("throws an exception if name starts with '/'", function(){
         var d = new Router();
@@ -727,6 +729,23 @@ describe('Router', function(){
           var keys = _.keys(urls);
           keys.length.should.equal(1);
           keys[0].should.equal('/1234/grandkid');
+    });
+
+    it ("can get children of starRoutes when the root path is not /", function(){
+          var d = new Router('/somepath');
+          d.route('/', { GET : function(req, res){
+                              res.end("GET output");
+                        }}).as('root');
+          d.route('/*asdf', { GET : function(req, res){
+                              res.end("GET output");
+                        }}).as('asdf*');
+          d.route('/*asdf/grandkid', { GET : function(req, res){
+                              res.end("GET output");
+                        }}).as('grandkid');
+          var urls = d.getChildUrls('http://asdf.com/somepath/1234');
+          var keys = _.keys(urls);
+          keys.length.should.equal(1);
+          keys[0].should.equal('/somepath/1234/grandkid');
     });
 
     it ("populates the names of child routes where possible", function(){

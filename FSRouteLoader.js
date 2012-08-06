@@ -54,7 +54,8 @@ var routePath = function(that, path, originalPaths){
     if (!!obj.module.member){
       var memberUrl = pathToStarChildRoute(url);
       name = name + '*';
-      that.router.route(memberUrl, obj.module.member).as(name);
+      var route = that.router.route(memberUrl, obj.module.member);
+      route.as(name);
     }
   } else {
     // it's a dir

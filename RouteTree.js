@@ -156,8 +156,8 @@ var findStarRoute = function(d, path){
 };
 
 var addStarRoute = function(d, path, route){
-  if (path === '/*'){
-    path = '/*root';
+  if (path === urlJoin(d.path, '/*')){
+    path = urlJoin(d.path, '*root');
   }
   var escapeSlashes = function(str){
     return;
