@@ -16,8 +16,6 @@ SamFSRouteLoader.prototype.load = function(cb){
   var that = this;
   var requirer = this.requirer;
   requirer.require(function(err){
-    console.log("REQUIRER DONE");
-    console.log(requirer.paths);
     if (err) {
       return cb(err);
     }
@@ -31,9 +29,7 @@ SamFSRouteLoader.prototype.load = function(cb){
     var originalPaths = _.clone(remainingPaths);
     var path = bestPathsPop(remainingPaths);
     while (path){
-      console.log("next path: ", path);
       try {
-        console.log('routing ', path, '... ');
         routePath(that, path, originalPaths);
       } catch (ex){
         return cb(ex);
