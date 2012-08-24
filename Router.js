@@ -1,7 +1,7 @@
 var _ = require('underscore');
 var events = require('events');
 var DetourError = require('./DetourError').DetourError;
-var FSRouteLoader = require('./FSRouteLoader').FSRouteLoader;
+var FSRouteLoader = require('./SamFSRouteLoader').SamFSRouteLoader;
 var url = require('url');
 var serverSupportedMethods = ["GET", "POST", 
                               "PUT", "DELETE",
