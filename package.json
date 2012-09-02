@@ -2,7 +2,7 @@
       "name": "detour",
       "description" : "detour is a reimagining of routing in node.js",
       "keywords" : ["api", "rest", "http", "resource", "routing", "router", "route"], 
-      "version": "0.9.0",
+      "version": "0.10.0",
       "bugs": {
        "url": "https://github.com/cainus/detour/issues"
       },

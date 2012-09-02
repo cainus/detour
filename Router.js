@@ -146,7 +146,9 @@ Router.prototype.dispatch = function(req, res, next){
 var handle = function(router, handler, method, req, res){
   var handlerObj = _.clone(handler);
   router.onRequest(handlerObj, req, res, function(err, newHandlerObj){
-    return newHandlerObj[method](req, res);
+    handlerObj.req = req;
+    handlerObj.res = res;
+    return newHandlerObj[method](handlerObj);
   });
 };
 
@@ -292,11 +294,14 @@ Router.prototype.route = function(path, handler){
 
   // add handler for HEAD if it doesn't exist
   if (!handler.HEAD && !!handler.GET){
-    handler.HEAD = function(req, res){ that.handleHEAD(req, res); };
+    handler.HEAD = function(context){
+      console.log('context: ', context);
+      that.handleHEAD(context.req, context.res); 
+    };
   }
   // add handler for OPTIONS if it doesn't exist
   if (!handler.OPTIONS){
-    handler.OPTIONS = function(req, res){ that.handleOPTIONS(req, res); };
+    handler.OPTIONS = function(context){ that.handleOPTIONS(context.req, context.res); };
   }
 
   this.routeTree.set(path, handler);
@@ -346,6 +351,8 @@ Router.prototype.handleOPTIONS = function(req, res){
 };
 
 Router.prototype.handleHEAD = function(req, res){
+  console.log("req: ", req);
+  console.log("res: ", res);
   var handler = this.getHandler(req.url);
   res.origEnd = res.end;
   res.end = function(){

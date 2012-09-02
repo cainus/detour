@@ -63,7 +63,7 @@ describe('Router', function(){
 
 	beforeEach(function(){
     this.res = new FakeRes();
-    this.simpleModule = {GET : function(req, res){res.send("OK");}};
+    this.simpleModule = {GET : function(context){context.res.end("OK");}};
 	});
 
   describe('#onRequest', function(){
@@ -107,7 +107,7 @@ describe('Router', function(){
   describe('#as', function(){
     it ('names the given route', function(){
         var d = new Router();
-        d.route('/', function(req, res){ res.send("hello world");}).as("root");
+        d.route('/', function(req, res){ res.end("hello world");}).as("root");
         var url = d.getUrl("root");
         url.should.equal('/');
     });
@@ -423,8 +423,8 @@ describe('Router', function(){
   describe('#before', function(){
     it ('allows middleware to be added to various paths', function(){
       var d = new Router();
-      d.route('/', { GET : function(req, res){res.end("GET");}}).as("index");
-      d.route('/*sub', { GET : function(req, res){res.end("subGET");}});
+      d.route('/', { GET : function(context){context.res.end("GET");}}).as("index");
+      d.route('/*sub', { GET : function(context){context.res.end("subGET");}});
       d.before(['/', '/*sub'], [function(req, res, next){
                                   res.end("early out");
                                 }]);
@@ -438,8 +438,8 @@ describe('Router', function(){
     it ('allows middleware to be added to various paths and still routes', function(){
       var d = new Router();
       var urls = [];
-      d.route('/', { GET : function(req, res){res.end("GET");}}).as("index");
-      d.route('/*sub', { GET : function(req, res){res.end("subGET");}});
+      d.route('/', { GET : function(context){context.res.end("GET");}}).as("index");
+      d.route('/*sub', { GET : function(context){context.res.end("subGET");}});
       d.before(['index', '/*sub'], [function(req, res, next){
                                   urls.push(req.url);
                                   next();
@@ -562,16 +562,16 @@ describe('Router', function(){
       });
       it ("405s if the resource has no GET", function(){
           var d = new Router();
-          d.route('/', { POST : function(req, res){return "POST";}});
+          d.route('/', { POST : function(context){return "POST";}});
           var req = { url : "http://asdf.com/", method : "HEAD"};
           d.dispatch(req, this.res);
           this.res.expectStatus(405);
       });
       it ("204s (no body) if the resource has a GET", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.setHeader("Content-Type", 'application/wth');
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.setHeader("Content-Type", 'application/wth');
+                              context.res.end("GET output");
                         }});
           var req = { url : "http://asdf.com/", method : "HEAD"};
           try {
@@ -596,8 +596,8 @@ describe('Router', function(){
       });
       it ("sets the proper headers for OPTIONS if the resource exists", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }});
           var req = { url : "http://asdf.com/", method : "OPTIONS"};
           d.dispatch(req, this.res);
@@ -607,15 +607,15 @@ describe('Router', function(){
     });
     it ("finds and runs a GET handler at a sub path", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }});
           d.route('/subpath', { 
-                              GET : function(req, res){
-                                res.end("GET output 2");
+                              GET : function(context){
+                                context.res.end("GET output 2");
                               },
                               DELETE : function(req, res){
-                                res.end("delete");
+                                context.res.end("delete");
                               }
                             });
           var req = { url : "http://asdf.com/subpath", method : "OPTIONS"};

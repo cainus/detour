@@ -2,10 +2,10 @@ var _ = require('underscore');
 
 exports.handler = {
 
-  GET : function(req, res){
-    console.log(req.url);
+  GET : function($){
+    console.log($.req.url);
     console.log("collection");
-    res.end('{"member" : "http://localhost:9999/1234/"}');
+    $.res.end('{"member" : "http://localhost:9999/1234/"}');
   }
 
 
@@ -15,10 +15,10 @@ exports.handler = {
 
 exports.member = {
 
-  GET : function(req, res){
-    console.log(req.detour.routeTree);
-    console.log(req.url);
+  GET : function($){
+    console.log($.req.detour.routeTree);
+    console.log($.req.url);
     console.log("member");
-    res.end('{"many" : "http://localhost:9999/1234/many"}');
+    $.res.end('{"many" : "http://localhost:9999/1234/many"}');
   }
 };
