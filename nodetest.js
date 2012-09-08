@@ -2,6 +2,9 @@ var http = require('http');
 var Router = require('./detour').Router;
 var router = new Router();
 //var exampleResource = {GET : function(req, res){res.end("test");}};
+
+router.freeRoute('/cross/:fingers_id', function($){ $.res.end("it worked!"); });
+
 router.routeDirectory('./test/sam_test_fixtures/resources', function(err){
   console.log("routed!!");
   console.log(router.routeTree);

@@ -49,8 +49,8 @@ var routePath = function(that, path, originalPaths){
     var name = new AutoNamer(that.paths).name(path);
     var nonMemberName = name.replace(/\*$/, ''); // strip any dynamic part off the end
     that.router.route(nonMemberUrl,obj.module.handler).as(nonMemberName);
-    if (!!obj.module.member){
-      that.router.route(url, obj.module.member).as(name);
+    if (!!obj.module.wildcard){
+      that.router.route(url, obj.module.wildcard).as(name);
     }
   } else {
     // it's a dir

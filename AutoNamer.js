@@ -5,7 +5,7 @@ var AutoNamer = function(files){
 };
 
 AutoNamer.prototype._isCollection = function(path){
-  return !!this.files[path].module.member;
+  return !!this.files[path].module.wildcard;
 };
 
 AutoNamer.prototype._pieceIsCollection = function(pieces, index){

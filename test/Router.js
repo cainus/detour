@@ -51,7 +51,7 @@ describe('Router', function(){
         should.fail("end() was not called.");
       }
       var args = _.toArray(arguments);
-      var diff = _.difference(this.endArgs, args);
+      var diff = (_.difference(this.endArgs, args)).concat(_.difference(args, this.endArgs));
       if (diff.length !== 0){
         should.fail("Expected end(" + 
                     args.join(", ") + 
@@ -73,7 +73,7 @@ describe('Router', function(){
           resource.url = req.url;
           cb(null, resource);
         };
-        d.route('/', {GET : function(req, res){res.end("hello world: " + this.url);}});
+        d.route('/', {GET : function($){$.res.end("hello world: " + this.url);}});
         var req = { url : "http://asdf.com/api", method : "GET"};
         d.dispatch(req, this.res);
         this.res.expectEnd("hello world: http://asdf.com/api");
@@ -99,7 +99,7 @@ describe('Router', function(){
     });
     it ("allows a path to be set if it exists", function(){
         var d = new Router();
-        d.route('/', function(req, res){ res.send("hello world");});
+        d.route('/', function($){ $.res.send("hello world");});
         d.name('/', 'root');
     });
   });
@@ -107,7 +107,7 @@ describe('Router', function(){
   describe('#as', function(){
     it ('names the given route', function(){
         var d = new Router();
-        d.route('/', function(req, res){ res.end("hello world");}).as("root");
+        d.route('/', function($){ $.res.end("hello world");}).as("root");
         var url = d.getUrl("root");
         url.should.equal('/');
     });
@@ -117,7 +117,7 @@ describe('Router', function(){
     it ('returns an empty hash for a static route', function(){
       // d.pathVariables('/this/is/the/path/1234/sub/') // returns {varname : 1234}
       var d = new Router();
-      d.route('/', function(req, res){ res.send("hello world");});
+      d.route('/', function($){ $.res.send("hello world");});
       _.keys(d.pathVariables('http://asdf.com/')).length.should.equal(0);
     });
     it ("throws an exception when the url doesn't route", function(){
@@ -128,13 +128,13 @@ describe('Router', function(){
     });
     it ('returns a hash of vars for a star route', function(){
       var d = new Router();
-      d.route('/', function(req, res){ res.send("hello world");});
-      d.route('/*onetwothreefour', function(req, res){ res.send("hello world");});
-      d.route('/*onetwothreefour/asdf', function(req, res){ res.send("hello world");});
-      d.route('/*onetwothreefour/asdf/*fourfivesixseven', function(req, res){ res.send("hello world");});
-      var vars = d.pathVariables('http://asdf.com/1234/asdf/4567');
+      d.route('/', function($){ $.res.send("hello world");});
+      d.route('/*onetwothreefour', function($){ $.res.send("hello world");});
+      d.route('/*onetwothreefour/asdf', function($){ $.res.send("hello world");});
+      d.route('/*onetwothreefour/asdf/*fourfivesixseven', function($){ $.res.send("hello world");});
+      var vars = d.pathVariables('http://asdf.com/%201234%20/asdf/4567');
       _.keys(vars).length.should.equal(2);
-      vars.onetwothreefour.should.equal('1234');
+      vars.onetwothreefour.should.equal(' 1234 ');
       vars.fourfivesixseven.should.equal('4567');
     });
   });
@@ -253,19 +253,62 @@ describe('Router', function(){
     });
   });
 
-	describe('#route', function(){
-    it ("emits an event on every routed object", function(){
+	describe('#freeRoute', function(){
+
+    it ("emits an event on every routed object", function(done){
       var d = new Router();
       d.on("route", function(resource){
         should.exist(resource.GET);
         _.isFunction(resource.GET).should.equal(true);
+        done();
+      });
+      d.freeRoute('/asdf/:asdf_id', function($){ $.res.end("hello world");});
+    });
+
+    it ("can route a function as a GET", function(done){
+        var d = new Router('/api');
+        d.freeRoute('/asdf/:asdf_id', function($){ 
+          done();
+        });
+        var req = { url : "http://asdf.com/asdf/1234", method : "GET"};
+        d.dispatch(req, this.res);
+    });
+
+    it ("can route an object with a GET", function(){
+        var d = new Router('/api');
+        d.freeRoute('/asdf/:asdf_id', { GET : function($){$.res.end("hello world");}});
+        var req = { url : "http://asdf.com/asdf/1234", method : "GET"};
+        d.dispatch(req, this.res);
+        this.res.expectEnd("hello world");
+    });
+    
+    it ("throws an exception if the module doesn't implement any methods", function(){
+        var d = new Router();
+        expectException(
+           function(){
+             d.freeRoute('/', {});
+           },
+           "HandlerHasNoHttpMethods", 
+           "The handler you're trying to route to should implement HTTP methods.",
+           {}
+        );
+    });
+
+  });
+	describe('#route', function(){
+    it ("emits an event on every routed object", function(done){
+      var d = new Router();
+      d.on("route", function(resource){
+        should.exist(resource.GET);
+        _.isFunction(resource.GET).should.equal(true);
+        done();
       });
       d.route('/', function(req, res){return "hello world";});
     });
 
     it ("can route a function as a GET", function(){
         var d = new Router('/api');
-        d.route('/', function(req, res){res.end("hello world");});
+        d.route('/', function($){$.res.end("hello world");});
         var req = { url : "http://asdf.com/api", method : "GET"};
         d.dispatch(req, this.res);
         this.res.expectEnd("hello world");
@@ -273,7 +316,7 @@ describe('Router', function(){
 
     it ("can route an object with a GET", function(){
         var d = new Router('/api');
-        d.route('/', { GET : function(req, res){res.end("hello world");}});
+        d.route('/', { GET : function($){$.res.end("hello world");}});
         var req = { url : "http://asdf.com/api", method : "GET"};
         d.dispatch(req, this.res);
         this.res.expectEnd("hello world");
@@ -296,7 +339,7 @@ describe('Router', function(){
         var d = new Router('/api');
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule);
-        d.route('/hello', { GET : function(req, res){res.end("hello world");}});
+        d.route('/hello', { GET : function($){$.res.end("hello world");}});
         var req = { url : "http://asdf.com/api/hello", method : "GET"};
         d.dispatch(req, this.res);
         this.res.expectEnd("hello world");
@@ -306,8 +349,8 @@ describe('Router', function(){
         var d = new Router('/api');
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule);
-        d.route('/hello/', { GET : function(req, res){res.send("hello world");}});
-        d.route('/hello/somenum', { GET : function(req, res){res.end("hello world 2");}});
+        d.route('/hello/', { GET : function($){$.res.send("hello world");}});
+        d.route('/hello/somenum', { GET : function($){$.res.end("hello world 2");}});
         var req = { url : "http://asdf.com/api/hello/somenum", method : "GET"};
         d.dispatch(req, this.res);
         this.res.expectEnd("hello world 2");
@@ -317,8 +360,8 @@ describe('Router', function(){
         var d = new Router('/api');
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule);
-        d.route('/hello/', { GET : function(req, res){res.send("hello world");}});
-        d.route('/hello/*somenum', { GET : function(req, res){res.end("hello world 2");}});
+        d.route('/hello/', { GET : function($){$.res.send("hello world");}});
+        d.route('/hello/*somenum', { GET : function($){$.res.end("hello world 2");}});
         var req = { url : "http://asdf.com/api/hello/1234", method : "GET"};
         d.dispatch(req, this.res);
         this.res.expectEnd("hello world 2");
@@ -539,14 +582,14 @@ describe('Router', function(){
     });
     it ("can route an object with a POST", function(){
         var d = new Router();
-        d.route('/', { POST : function(req, res){res.end("POST");}});
+        d.route('/', { POST : function($){$.res.end("POST");}});
         var req = { url : "http://asdf.com/", method : "POST"};
         d.dispatch(req, this.res);
         this.res.expectEnd("POST");
     });
     it ("can dispatch a url with a querystring", function(){
         var d = new Router();
-        d.route('/', { GET : function(req, res){res.end("GET");}});
+        d.route('/', { GET : function($){$.res.end("GET");}});
         var req = { url : "http://asdf.com/?asdf=1234", method : "GET"};
         d.dispatch(req, this.res);
         this.res.expectEnd("GET");

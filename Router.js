@@ -3,11 +3,12 @@ var events = require('events');
 var DetourError = require('./DetourError').DetourError;
 var FSRouteLoader = require('./SamFSRouteLoader').SamFSRouteLoader;
 var url = require('url');
+var querystring = require('querystring');
 var serverSupportedMethods = ["GET", "POST", 
                               "PUT", "DELETE",
                               "HEAD", "OPTIONS"];
 var RouteTree = require('./RouteTree').RouteTree;
-
+var FreeRouteCollection = require('./FreeRouteCollection');
 
 
 function Router(path){
@@ -16,6 +17,7 @@ function Router(path){
   this.shouldHandle404s = true;
   this.shouldThrowExceptions = false;
   this.routeTree = new RouteTree(path);
+  this.freeRoutes = new FreeRouteCollection();
   this.routes = {};
   this.names = {};
   this.requestNamespace = 'detour';  // req.detour will have this object
@@ -43,7 +45,17 @@ Router.prototype.getHandler = function(url){
   } catch(ex){
       switch(ex){
         case "Not Found" :
-          throw new DetourError('404', 'Not Found', "" + url);
+          try { 
+            route = this.freeRoutes.get(url);
+          } catch (ex){
+            if (ex === "Not Found"){
+              throw new DetourError('404', 'Not Found', "" + url);
+            } else {
+              console.log(ex);
+              throw newex;
+            }
+          }
+          break;
         case "URI Too Long" :
           newex = new DetourError('414', 'Request-URI Too Long');
           throw newex;
@@ -62,7 +74,7 @@ Router.prototype.pathVariables = function(url){
   var matches = path.match(route.regex);
   var retval = {};
   for (var i =0; i < varnames.length; i++){
-    retval[varnames[i]] = matches[i + 1];
+    retval[varnames[i]] = querystring.unescape(matches[i + 1]);
   }
   return retval;
 };
@@ -86,7 +98,17 @@ Router.prototype.dispatch = function(req, res, next){
       var newex;
       switch(ex){
         case "Not Found" :
-          throw new DetourError('404', 'Not Found', "" + url);
+          try { 
+            route = this.freeRoutes.get(req.url);
+          } catch (ex){
+            if (ex === "Not Found"){
+              throw new DetourError('404', 'Not Found', "" + url);
+            } else {
+              console.log(ex);
+              throw newex;
+            }
+          }
+          break;
         case "URI Too Long" :
           newex = new DetourError('414', 'Request-URI Too Long');
           throw newex;
@@ -94,12 +116,24 @@ Router.prototype.dispatch = function(req, res, next){
           throw ex;
       }
     }
+    // if we shouldn't throw exceptions...
     switch(ex){
       case "Not Found" :
-        if (this.shouldHandle404s){
-          return this.handle404(req, res);
-        } else {
-          return next();
+        try { 
+          route = this.freeRoutes.get(req.url);
+        } catch (ex){
+          if (ex === "Not Found"){
+            if (this.shouldHandle404s){
+              return this.handle404(req, res);
+            } else {
+              return next();
+            }
+          } else {
+            console.log("unknown route error: ");
+            console.log(ex);
+            throw ex;
+          }
+
         }
         break;
       case "URI Too Long" :
@@ -146,9 +180,13 @@ Router.prototype.dispatch = function(req, res, next){
 var handle = function(router, handler, method, req, res){
   var handlerObj = _.clone(handler);
   router.onRequest(handlerObj, req, res, function(err, newHandlerObj){
-    handlerObj.req = req;
-    handlerObj.res = res;
-    return newHandlerObj[method](handlerObj);
+    if (!err){
+      handlerObj.req = req;
+      handlerObj.res = res;
+      return newHandlerObj[method](handlerObj);
+    } else {
+      this.handle500(req, res, err);
+    }
   });
 };
 
@@ -267,7 +305,12 @@ Router.prototype.before = function(paths, middlewares){
   });
 };
 
-Router.prototype.route = function(path, handler){
+Router.prototype.freeRoute = function(path, handler){
+  this.route(path, handler, true);
+};
+
+Router.prototype.route = function(inPath, handler, free){
+  free = free || false;
 
   if (_.isNull(handler) || _.isUndefined(handler)){
       throw new DetourError('ArgumentError',
@@ -275,7 +318,7 @@ Router.prototype.route = function(path, handler){
         '');
   }
 
-  path = urlJoin(this.path, path);
+  path = urlJoin(this.path, inPath);
 
   if (_.isFunction(handler)){
     // if it's a function, assume it's for GET
@@ -295,7 +338,6 @@ Router.prototype.route = function(path, handler){
   // add handler for HEAD if it doesn't exist
   if (!handler.HEAD && !!handler.GET){
     handler.HEAD = function(context){
-      console.log('context: ', context);
       that.handleHEAD(context.req, context.res); 
     };
   }
@@ -304,7 +346,11 @@ Router.prototype.route = function(path, handler){
     handler.OPTIONS = function(context){ that.handleOPTIONS(context.req, context.res); };
   }
 
-  this.routeTree.set(path, handler);
+  if (free){
+    this.freeRoutes.set(inPath, handler);
+  } else {
+    this.routeTree.set(path, handler);
+  }
 
   this.emit("route", handler);
 
@@ -351,8 +397,6 @@ Router.prototype.handleOPTIONS = function(req, res){
 };
 
 Router.prototype.handleHEAD = function(req, res){
-  console.log("req: ", req);
-  console.log("res: ", res);
   var handler = this.getHandler(req.url);
   res.origEnd = res.end;
   res.end = function(){

@@ -14,7 +14,7 @@ var getSimpleModule = function(fullpath){
 var getCollectionModule = function(fullpath){
   return { module : { 
               handler : {GET : function(req, res){res.end(fullpath);} },
-              member : {GET : function(req, res){res.end("MEMBER " + fullpath);} }
+              wildcard : {GET : function(req, res){res.end("WILDCARD " + fullpath);} }
            },
            fullpath: fullpath,
            type : 'file'

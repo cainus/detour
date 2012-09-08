@@ -5,7 +5,7 @@ var AutoPather = function(files){
 };
 
 AutoPather.prototype._isCollection = function(path){
-  return !!this.files[path].module.member;
+  return !!this.files[path].module.wildcard;
 };
 
 AutoPather.prototype._pieceIsCollection = function(pieces, index){

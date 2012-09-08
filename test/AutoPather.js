@@ -20,7 +20,7 @@ describe("AutoPather", function(){
     it ("can path a collection index.js", function(){
       var pather = new AutoPather(
       { '/index.js':
-          { module: { handler: {}, member : {} },
+          { module: { handler: {}, wildcard : {} },
             fullpath: '/asdf/index.js',
             type: 'file' }}
       );
@@ -48,7 +48,7 @@ describe("AutoPather", function(){
       { 
         
         '/index.js':
-          { module: { handler: {}, member : {} },
+          { module: { handler: {}, wildcard : {} },
             fullpath: '/asdf/index.js',
             type: 'file' },
       
@@ -66,12 +66,12 @@ describe("AutoPather", function(){
       { 
         
         '/index.js':
-          { module: { handler: {}, member : {} },
+          { module: { handler: {}, wildcard : {} },
             fullpath: '/asdf/index.js',
             type: 'file' },
       
         '/song.js':
-          { module: { handler: {}, member : {} },
+          { module: { handler: {}, wildcard : {} },
             fullpath: '/asdf/song.js',
             type: 'file' }
       }
@@ -84,12 +84,12 @@ describe("AutoPather", function(){
       { 
         
         '/index.js':
-          { module: { handler: {}, member : {} },
+          { module: { handler: {}, wildcard : {} },
             fullpath: '/asdf/index.js',
             type: 'file' },
       
         '/artist.js':
-          { module: { handler: {}, member : {} },
+          { module: { handler: {}, wildcard : {} },
             fullpath: '/asdf/artist.js',
             type: 'file' },
 
@@ -107,17 +107,17 @@ describe("AutoPather", function(){
       { 
         
         '/index.js':
-          { module: { handler: {}, member : {} },
+          { module: { handler: {}, wildcard : {} },
             fullpath: '/asdf/index.js',
             type: 'file' },
       
         '/artist.js':
-          { module: { handler: {}, member : {} },
+          { module: { handler: {}, wildcard : {} },
             fullpath: '/asdf/artist.js',
             type: 'file' },
 
         '/artist/song.js':
-          { module: { handler: {}, member : {} },
+          { module: { handler: {}, wildcard : {} },
             fullpath: '/asdf/artist/song.js',
             type: 'file' }
       }
