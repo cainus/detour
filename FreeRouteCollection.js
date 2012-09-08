@@ -72,8 +72,12 @@ var getPath = function(urlstr){
  * @api private
  */
 pathRegexp = function(path, keys, sensitive, strict) {
-  if (path instanceof RegExp) return path;
-  if (Array.isArray(path)) path = '(' + path.join('|') + ')';
+  if (path instanceof RegExp) { 
+    return path; 
+  }
+  if (Array.isArray(path)){ 
+    path = '(' + path.join('|') + ')';
+  }
   path = path
     .concat(strict ? '' : '/?')
     .replace(/\/\(/g, '(?:/')

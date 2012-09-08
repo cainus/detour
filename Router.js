@@ -318,7 +318,7 @@ Router.prototype.route = function(inPath, handler, free){
         '');
   }
 
-  path = urlJoin(this.path, inPath);
+  var path = urlJoin(this.path, inPath);
 
   if (_.isFunction(handler)){
     // if it's a function, assume it's for GET
