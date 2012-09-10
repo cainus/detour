@@ -424,7 +424,6 @@ Router.prototype.handleHEAD = function(req, res){
   res.write = function(){ };
   res.origWriteHead = res.writeHead;
   res.writeHead = function(code){
-    console.log("writing head");
     if (code === 200){
       res.origWriteHead(204);
     } else {
