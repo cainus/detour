@@ -396,6 +396,7 @@ Router.prototype.handleOPTIONS = function(req, res){
   res.end();
 };
 
+/*
 Router.prototype.handleHEAD = function(req, res){
   var handler = this.getHandler(req.url);
   res.origEnd = res.end;
@@ -406,6 +407,31 @@ Router.prototype.handleHEAD = function(req, res){
     return this.handle405(req, res);
   }
   res.writeHead(204);
+  handle(this, handler, 'GET', req, res);
+};*/
+
+
+Router.prototype.handleHEAD = function(req, res){
+  var handler = this.getHandler(req.url);
+  if (!handler.GET){
+    return this.handle405(req, res);
+  }
+  res.origEnd = res.end;
+  res.end = function(){
+    res.origEnd();
+  };
+  res.origWrite = res.write;
+  res.write = function(){ };
+  res.origWriteHead = res.writeHead;
+  res.writeHead = function(code){
+    console.log("writing head");
+    if (code === 200){
+      res.origWriteHead(204);
+    } else {
+      res.origWriteHead(code);
+    }
+  };
+  res.statusCode = 204;
   handle(this, handler, 'GET', req, res);
 };
 

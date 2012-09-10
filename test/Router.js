@@ -25,13 +25,13 @@ describe('Router', function(){
     this.body = '';
     this.endWasCalled = false;
     this.headers = {};
-    this.status = 0;
+    this.statusCode = 0;
     this.end = function(data){ 
       this.endArgs = _.toArray(arguments);
       this.body = data || ''; 
       this.endWasCalled = true;
     };
-    this.writeHead = function(code){this.status = code;};
+    this.writeHead = function(code){this.statusCode = code;};
     this.setHeader = function(name, value){this.headers[name] = value;};
     this.expectHeader = function(name, value){
       if (!this.headers[name]){
@@ -44,7 +44,7 @@ describe('Router', function(){
       }
     };
     this.expectStatus = function(status){
-      this.status.should.equal(status);
+      this.statusCode.should.equal(status);
     };
     this.expectEnd = function() { 
       if (!this.endWasCalled){
@@ -526,7 +526,7 @@ describe('Router', function(){
       var d = new Router();
       var req = {url : "http://asdf.com/", method : 'GET'};
       d.dispatch(req, this.res);
-      this.res.status.should.equal(404);
+      this.res.statusCode.should.equal(404);
       this.res.body.should.equal('');
     });
     it ("calls next() when it doesn't find a matching route and shouldHandle404s is false", function(){
