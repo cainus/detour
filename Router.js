@@ -300,8 +300,6 @@ Router.prototype.route = function(inPath, handler, free){
     this.routeTree.set(path, handler);
   }
 
-  this.emit("route", handler);
-
   // A call to route() will return an object with a function 'as' for
   // naming the route. eg: d.route('/', handler).as('index')
   var chainObject = {as : function(name){ that.name(path, name); }};

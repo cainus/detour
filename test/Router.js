@@ -175,16 +175,6 @@ describe('Router', function(){
 
 	describe('#freeRoute', function(){
 
-    it ("emits an event on every routed object", function(done){
-      var d = new Router();
-      d.on("route", function(resource){
-        should.exist(resource.GET);
-        _.isFunction(resource.GET).should.equal(true);
-        done();
-      });
-      d.freeRoute('/asdf/:asdf_id', function($){ $.res.end("hello world");});
-    });
-
     it ("can route a function as a GET", function(done){
         var d = new Router('/api');
         d.freeRoute('/asdf/:asdf_id', function($){ 
@@ -216,15 +206,6 @@ describe('Router', function(){
 
   });
 	describe('#route', function(){
-    it ("emits an event on every routed object", function(done){
-      var d = new Router();
-      d.on("route", function(resource){
-        should.exist(resource.GET);
-        _.isFunction(resource.GET).should.equal(true);
-        done();
-      });
-      d.route('/', function(context){return "hello world";});
-    });
 
     it ("can route a function as a GET", function(){
         var d = new Router('/api');
