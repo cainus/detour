@@ -9,7 +9,7 @@ var serverSupportedMethods = ["GET", "POST",
                               "HEAD", "OPTIONS"];
 var RouteTree = require('./RouteTree').RouteTree;
 var FreeRouteCollection = require('./FreeRouteCollection');
-
+// TODO use freeRoutes everywhere!!
 
 function Router(path){
   this.path = path || '/';
