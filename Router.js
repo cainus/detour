@@ -14,8 +14,6 @@ var FreeRouteCollection = require('./FreeRouteCollection');
 function Router(path){
   this.path = path || '/';
   this.path = urlJoin(this.path);
-  this.shouldHandle404s = true;
-  this.shouldThrowExceptions = false;
   this.routeTree = new RouteTree(path);
   this.freeRoutes = new FreeRouteCollection();
   this.routes = {};
@@ -94,40 +92,13 @@ Router.prototype.dispatch = function(req, res, next){
   try {
     route = this.routeTree.get(req.url);
   } catch (ex){
-    if (this.shouldThrowExceptions){
-      var newex;
-      switch(ex){
-        case "Not Found" :
-          try { 
-            route = this.freeRoutes.get(req.url);
-          } catch (ex){
-            if (ex === "Not Found"){
-              throw new DetourError('404', 'Not Found', "" + url);
-            } else {
-              console.log(ex);
-              throw newex;
-            }
-          }
-          break;
-        case "URI Too Long" :
-          newex = new DetourError('414', 'Request-URI Too Long');
-          throw newex;
-        default :
-          throw ex;
-      }
-    }
-    // if we shouldn't throw exceptions...
     switch(ex){
       case "Not Found" :
         try { 
           route = this.freeRoutes.get(req.url);
         } catch (ex){
           if (ex === "Not Found"){
-            if (this.shouldHandle404s){
               return this.handle404(req, res);
-            } else {
-              return next();
-            }
           } else {
             console.log("unknown route error: ");
             console.log(ex);
@@ -150,18 +121,10 @@ Router.prototype.dispatch = function(req, res, next){
     // that it doesn't recognize, so we can't properly 501 on those.
     // We can 501 on ones we don't support (that node does) that 
     // make it through though.
-    if (this.shouldThrowExceptions){ 
-      throw new DetourError('501', 'Not Implemented');
-    } else {
-      return this.handle501(req, res);
-    }
+    return this.handle501(req, res);
   }
   if (!handler[method]){
-    if (this.shouldThrowExceptions){ 
-      throw new DetourError('405', 'Method Not Allowed');
-    } else {
-      return this.handle405(req, res);
-    }
+    return this.handle405(req, res);
   }
   try {
     executeMiddleware(route.middlewares, req, res, function(err){
@@ -169,11 +132,7 @@ Router.prototype.dispatch = function(req, res, next){
       return handle(that, handler, method, req, res);
     });
   } catch(ex){
-    if (this.shouldThrowExceptions){ 
-      throw new DetourError('500', 'Internal Server Error', ex);
-    } else {
-      this.handle500(req, res, ex);
-    }
+    this.handle500(req, res, ex);
   }
 };
 

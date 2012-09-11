@@ -139,86 +139,6 @@ describe('Router', function(){
     });
   });
 
-  describe('#shouldThrowExceptions', function(){
-    describe('when set to true', function(){
-      it ('throws an exception when the uri is too long', function(){
-        var d = new Router();
-        d.shouldThrowExceptions = true;
-        var simpleModule = this.simpleModule;
-        var bigurl = "1";
-        _.times(4097, function(){bigurl += '1';});
-        d.route('/', simpleModule);
-        var req = { url : bigurl, method : "PUT"};
-        try {
-          d.dispatch(req, this.res);
-          should.fail('expected exception was not raised');
-        } catch(ex){
-          ex.name.should.equal('414');
-          ex.message.should.equal('Request-URI Too Long');
-        }
-      });
-      it ('throws an exception when the URI is not found', function(){
-        var d = new Router();
-        d.shouldThrowExceptions = true;
-        var req = {url : "http://asdf.com/", method : 'GET'};
-        try {
-          d.dispatch(req, this.res);
-          should.fail('expected exception was not raised');
-        } catch(ex){
-          ex.name.should.equal('404');
-          ex.message.should.equal('Not Found');
-        }
-      });
-      it ("throws an exception on 405s", function(){
-        var d = new Router();
-        d.shouldThrowExceptions = true;
-        var simpleModule = this.simpleModule;
-        d.route('/', simpleModule);
-        d.route('/hello', { GET : function(req, res){res.send("hello world");}});
-        var req = { url : "http://asdf.com/hello", method : "PUT"};
-        try {
-          d.dispatch(req, this.res);
-          should.fail('expected exception was not raised');
-        } catch(ex){
-          ex.name.should.equal('405');
-          ex.message.should.equal('Method Not Allowed');
-        }
-      });
-      it ("throws an exception on 500", function(){
-        var d = new Router('/api');
-        d.shouldThrowExceptions = true;
-        var simpleModule = this.simpleModule;
-        d.route('/', simpleModule);
-        d.route('/fail', { GET : function(req, res){ throw 'wthizzle';}});
-        var req = { url : "http://asdf.com/api/fail", method : "GET"};
-        try {
-          d.dispatch(req, this.res);
-          should.fail('expected exception was not raised');
-        } catch(ex){
-          ex.name.should.equal('500');
-          ex.message.should.equal('Internal Server Error');
-          ex.detail.should.equal('wthizzle');
-        }
-      });
-
-      it ("throws an exception on 501s", function(){
-        var d = new Router();
-        d.shouldThrowExceptions = true;
-        var simpleModule = this.simpleModule;
-        d.route('/', simpleModule);
-        d.route('/hello', { GET : function(req, res){res.send("hello world");}});
-        var req = { url : "http://asdf.com/hello", method : "TRACE"};
-        try {
-          d.dispatch(req, this.res);
-          should.fail('expected exception was not raised');
-        } catch(ex){
-          ex.name.should.equal('501');
-          ex.message.should.equal('Not Implemented');
-        }
-      });
-    });
-  });
-
 	describe('#getHandler', function(){
     it ("when accessing an undefined url, throws an exception",
       function(){
@@ -528,16 +448,6 @@ describe('Router', function(){
       d.dispatch(req, this.res);
       this.res.statusCode.should.equal(404);
       this.res.body.should.equal('');
-    });
-    it ("calls next() when it doesn't find a matching route and shouldHandle404s is false", function(){
-      var d = new Router();
-      d.shouldHandle404s = false;
-      var req = {url : "http://asdf.com/", method : 'GET'};
-      var success = false;
-      function next(){success = true;}
-      d.dispatch(req, this.res, next);
-      this.res.body.should.equal('');
-      success.should.equal(true);
     });
 
     it ("414s if the url is too long", function(){
