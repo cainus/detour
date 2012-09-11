@@ -1,5 +1,4 @@
 var _ = require('underscore');
-var events = require('events');
 var DetourError = require('./DetourError').DetourError;
 var FSRouteLoader = require('./SamFSRouteLoader').SamFSRouteLoader;
 var url = require('url');
@@ -22,8 +21,6 @@ function Router(path){
   var that = this;
 
 }
-
-Router.prototype = Object.create(events.EventEmitter.prototype);
 
 _.each([414, 404, 405, 501, 500, 'OPTIONS'], function(type){
   Router.prototype['on' + type] = function(handler){  
