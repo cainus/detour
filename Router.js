@@ -20,13 +20,18 @@ function Router(path){
   this.names = {};
   this.requestNamespace = 'detour';  // req.detour will have this object
   var that = this;
-  this.connectMiddleware = function(req, res, next){
-    that.dispatch(req, res, next);
-  };
 
 }
 
 Router.prototype = Object.create(events.EventEmitter.prototype);
+
+_.each([414, 404, 405, 501, 500, 'OPTIONS'], function(type){
+  Router.prototype['on' + type] = function(handler){  
+    this['handle' + type] = function(req, res){
+      handler(req, res);
+    };
+  } ;
+});
 
 // cb simply takes an err object.  It is called when the directory is done loading.
 Router.prototype.routeDirectory = function(dir, cb){
@@ -84,7 +89,7 @@ Router.prototype.onRequest = function(handler, req, res, cb){
   cb(null, handler);
 };
 
-Router.prototype.dispatch = function(req, res, next){
+Router.prototype.dispatch = function(req, res){
   req[this.requestNamespace] = this;
   var that = this;
   var handler;
@@ -127,10 +132,7 @@ Router.prototype.dispatch = function(req, res, next){
     return this.handle405(req, res);
   }
   try {
-    executeMiddleware(route.middlewares, req, res, function(err){
-      if (err) throw err;
       return handle(that, handler, method, req, res);
-    });
   } catch(ex){
     this.handle500(req, res, ex);
   }
@@ -245,25 +247,6 @@ Router.prototype.getUrl = function(path, var_map){
 };
 
 
-Router.prototype.before = function(paths, middlewares){
-  if (!_.isArray(paths)){
-    throw 'before() requires an array of paths as the first parameter';
-  }
-  if (!_.isArray(middlewares)){
-    throw 'before() requires an array of functions as the second parameter';
-  }
-  var that = this;
-  _.each(paths, function(path){
-    // validate the path
-    path = pathIfName(that, path);
-    var route = that.routeTree.get(path);
-    // push each middleware onto its middleware array
-    _.each(middlewares, function(m){
-      route.middlewares.push(m);
-    });
-  });
-};
-
 Router.prototype.freeRoute = function(path, handler){
   this.route(path, handler, true);
 };
@@ -355,21 +338,6 @@ Router.prototype.handleOPTIONS = function(req, res){
   res.end();
 };
 
-/*
-Router.prototype.handleHEAD = function(req, res){
-  var handler = this.getHandler(req.url);
-  res.origEnd = res.end;
-  res.end = function(){
-    res.origEnd();
-  };
-  if (!handler.GET){
-    return this.handle405(req, res);
-  }
-  res.writeHead(204);
-  handle(this, handler, 'GET', req, res);
-};*/
-
-
 Router.prototype.handleHEAD = function(req, res){
   var handler = this.getHandler(req.url);
   if (!handler.GET){
@@ -414,24 +382,6 @@ Router.prototype.name = function(path, name){
 };
 
 exports.Router = Router;
-
-var executeMiddleware = function(middlewares, req, res, done){
-  var middlewareIndex = -1;
-  var next = function(err){
-    middlewareIndex++;
-    if (err){
-      return done(err);
-    } else {
-      var m = middlewares[middlewareIndex];
-      if (!!m){
-        return m(req, res, next);
-      } else {
-        return done();
-      }
-    }
-  };
-  next();
-};
 
 
 // unexposed helpers ---------

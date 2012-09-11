@@ -373,53 +373,6 @@ describe('Router', function(){
     });
   });
 
-  describe('#connectMiddleware', function(){
-    it ("is a function that plugs this into express in as middleware", function(){
-      var d = new Router();
-      var called = false;
-      d.dispatch = function(req, res, next){ called = true; };
-      d.connectMiddleware({}, {}, function(){});
-      called.should.equal(true);
-    });
-  });
-
-  describe('#before', function(){
-    it ('allows middleware to be added to various paths', function(){
-      var d = new Router();
-      d.route('/', { GET : function(context){context.res.end("GET");}}).as("index");
-      d.route('/*sub', { GET : function(context){context.res.end("subGET");}});
-      d.before(['/', '/*sub'], [function(req, res, next){
-                                  res.end("early out");
-                                }]);
-      var req = { url : "http://asdf.com/", method : "GET"};
-      d.dispatch(req, this.res);
-      this.res.body.should.equal("early out");
-      req = { url : "http://asdf.com/1234", method : "GET"};
-      d.dispatch(req, this.res);
-      this.res.body.should.equal("early out");
-    });
-    it ('allows middleware to be added to various paths and still routes', function(){
-      var d = new Router();
-      var urls = [];
-      d.route('/', { GET : function(context){context.res.end("GET");}}).as("index");
-      d.route('/*sub', { GET : function(context){context.res.end("subGET");}});
-      d.before(['index', '/*sub'], [function(req, res, next){
-                                  urls.push(req.url);
-                                  next();
-                                }]);
-      var req = { url : "http://asdf.com/", method : "GET"};
-      d.dispatch(req, this.res);
-      this.res.body.should.equal("GET");
-      req = { url : "http://asdf.com/1234", method : "GET"};
-      d.dispatch(req, this.res);
-      this.res.body.should.equal("subGET");
-      urls.length.should.equal(2);
-      urls[0].should.equal('http://asdf.com/');
-      urls[1].should.equal('http://asdf.com/1234');
-    });
-  });
-
-
   describe('#dispatch', function(){
 
     it ("decorates every request object with the Router object as req.detour by default", 
@@ -442,53 +395,99 @@ describe('Router', function(){
         }
     );
 
-    it ("404s when it doesn't find a matching route and shouldHandle404s is true", function(){
-      var d = new Router();
-      var req = {url : "http://asdf.com/", method : 'GET'};
-      d.dispatch(req, this.res);
-      this.res.statusCode.should.equal(404);
-      this.res.body.should.equal('');
+    context("there's no matching route", function(){
+      beforeEach(function(){
+        this.d = new Router();
+        this.req = {url : "http://asdf.com/", method : 'GET'};
+      });
+      it ("calls the default 404 handler ", function(){
+        this.d.dispatch(this.req, this.res);
+        this.res.statusCode.should.equal(404);
+        this.res.body.should.equal('');
+      });
+      it ("calls the on404 handler if it's set", function(done){
+        this.d.on404(function(req, res){
+          done();
+        });
+        this.d.dispatch(this.req, this.res);
+      });
     });
 
-    it ("414s if the url is too long", function(){
-      var d = new Router();
-      var simpleModule = this.simpleModule;
-      var bigurl = "1";
-      _.times(4097, function(){bigurl += '1';});
-      d.route('/', simpleModule);
-      var req = { url : bigurl, method : "PUT"};
-      d.dispatch(req, this.res);
-      this.res.expectStatus(414);
+    context("the url is too long", function(){
+      beforeEach(function(){
+        this.d = new Router();
+        var simpleModule = this.simpleModule;
+        var bigurl = "1";
+        _.times(4097, function(){bigurl += '1';});
+        this.d.route('/', simpleModule);
+        this.req = { url : bigurl, method : "PUT"};
+      });
+      it ("calls the default 414 handler", function(){
+        this.d.dispatch(this.req, this.res);
+        this.res.expectStatus(414);
+      });
+
+      it ("calls the on414 handler if it's set", function(done){
+        this.d.on414(function(req, res){ done(); });
+        this.d.dispatch(this.req, this.res);
+      });
+
     });
 
-    it ("405s on a resource-unsupported method", function(){
-      var d = new Router();
-      var simpleModule = this.simpleModule;
-      d.route('/', simpleModule);
-      d.route('/hello', { GET : function(req, res){res.send("hello world");}});
-      var req = { url : "http://asdf.com/hello", method : "PUT"};
-      d.dispatch(req, this.res);
-      this.res.expectStatus(405);
-      this.res.expectHeader('Allow', 'OPTIONS,GET,HEAD');
+    context("the resource doesn't support the http method", function(){
+      beforeEach(function(){
+        this.d = new Router();
+        var simpleModule = this.simpleModule;
+        this.d.route('/', simpleModule);
+        this.d.route('/hello', { GET : function(req, res){res.send("hello world");}});
+        this.req = { url : "http://asdf.com/hello", method : "PUT"};
+
+      });
+      it ("calls the default 405 handler", function(){
+        this.d.dispatch(this.req, this.res);
+        this.res.expectStatus(405);
+        this.res.expectHeader('Allow', 'OPTIONS,GET,HEAD');
+      });
+      it ("calls the on405 handler if it's set", function(done){
+        this.d.on405(function(req, res){ done(); });
+        this.d.dispatch(this.req, this.res);
+      });
+
     });
-    it ("500s on a directly thrown exception", function(){
-      var d = new Router();
-      var simpleModule = this.simpleModule;
-      d.route('/', simpleModule);
-      d.route('/fail', { GET : function(req, res){ throw 'wthizzle';}});
-      var req = { url : "http://asdf.com/fail", method : "GET"};
-      d.dispatch(req, this.res);
-      this.res.expectStatus(500);
+    context("an exception is thrown", function(){
+      beforeEach(function(){
+        this.d = new Router();
+        var simpleModule = this.simpleModule;
+        this.d.route('/', simpleModule);
+        this.d.route('/fail', { GET : function(req, res){ throw 'wthizzle';}});
+        this.req = { url : "http://asdf.com/fail", method : "GET"};
+      });
+      it ("calls the default 500 handler", function(){
+        this.d.dispatch(this.req, this.res);
+        this.res.expectStatus(500);
+      });
+      it ("calls the on500 handler if it's set", function(done){
+        this.d.on500(function(req, res){ done(); });
+        this.d.dispatch(this.req, this.res);
+      });
     });
 
-    it ("501s on a server-unsupported method", function(){
-      var d = new Router();
-      var simpleModule = this.simpleModule;
-      d.route('/', simpleModule);
-      d.route('/hello', { GET : function(req, res){res.send("hello world");}});
-      var req = { url : "http://asdf.com/hello", method : "TRACE"};
-      d.dispatch(req, this.res);
-      this.res.expectStatus(501);
+    context("the server doesn't support the http method", function(){
+      beforeEach(function(){
+        this.d = new Router();
+        var simpleModule = this.simpleModule;
+        this.d.route('/', simpleModule);
+        this.d.route('/hello', { GET : function(req, res){res.send("hello world");}});
+        this.req = { url : "http://asdf.com/hello", method : "TRACE"};
+      });
+      it ("calls the default 501 handler", function(){
+        this.d.dispatch(this.req, this.res);
+        this.res.expectStatus(501);
+      });
+      it ("calls the on501 handler if it's set", function(done){
+        this.d.on501(function(req, res){ done(); });
+        this.d.dispatch(this.req, this.res);
+      });
     });
     it ("can route an object with a POST", function(){
         var d = new Router();
@@ -547,15 +546,26 @@ describe('Router', function(){
           d.dispatch(req, this.res);
           this.res.expectStatus(404);
       });
-      it ("sets the proper headers for OPTIONS if the resource exists", function(){
-          var d = new Router();
-          d.route('/', { GET : function(context){
-                              context.res.end("GET output");
-                        }});
-          var req = { url : "http://asdf.com/", method : "OPTIONS"};
-          d.dispatch(req, this.res);
-          this.res.expectStatus(204);
-          this.res.expectHeader('Allow', 'OPTIONS,GET,HEAD');
+      context("when the resource exists", function(){
+        beforeEach(function(){
+          this.d = new Router();
+          this.d.route('/', { GET : function(context){
+                                context.res.end("GET output");
+                          }});
+          this.req = { url : "http://asdf.com/", method : "OPTIONS"};
+        
+        });
+        it ("sets the proper headers for OPTIONS", function(){
+            this.d.dispatch(this.req, this.res);
+            this.res.expectStatus(204);
+            this.res.expectHeader('Allow', 'OPTIONS,GET,HEAD');
+        });
+        it ("calls the onOPTIONS handler if it was set.", function(done){
+          this.d.onOPTIONS(function(req, res){
+            done();
+          });
+          this.d.dispatch(this.req, this.res);
+        });
       });
     });
     it ("finds and runs a GET handler at a sub path", function(){
