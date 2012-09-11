@@ -69,13 +69,13 @@ describe('Router', function(){
   describe('#onRequest', function(){
     it ("can be overridden to decorate the resource object", function(){
         var d = new Router('/api');
-        d.onRequest = function(resource, req, res, cb){
-          resource.url = req.url;
+        d.onRequest = function(resource, cb){
+          resource.url = resource.req.url;
           cb(null, resource);
         };
         d.route('/', {GET : function($){$.res.end("hello world: " + this.url);}});
         var req = { url : "http://asdf.com/api", method : "GET"};
-        d.dispatch(req, this.res);
+        d.dispatch({ req : req, res : this.res});
         this.res.expectEnd("hello world: http://asdf.com/api");
     });
   });
@@ -160,14 +160,14 @@ describe('Router', function(){
     it ("when accessing a defined url, returns a handler",
       function(){
         var d = new Router();
-        d.route('/', function(req, res){ res.send("hello world");});
+        d.route('/', function(context){ context.res.send("hello world");});
         var handler = d.getHandler('/');
         should.exist(handler.GET);
       }
     );
     it ("when accessing a defined url with a querystring, returns a handler", function(){
         var d = new Router();
-        d.route('/', function(req, res){ res.send("hello world");});
+        d.route('/', function(context){ context.res.send("hello world");});
         var handler = d.getHandler('/?asdf=1234');
         should.exist(handler.GET);
     });
@@ -191,17 +191,17 @@ describe('Router', function(){
           done();
         });
         var req = { url : "http://asdf.com/asdf/1234", method : "GET"};
-        d.dispatch(req, this.res);
+        d.dispatch({req : req, res : this.res});
     });
 
     it ("can route an object with a GET", function(){
         var d = new Router('/api');
         d.freeRoute('/asdf/:asdf_id', { GET : function($){$.res.end("hello world");}});
         var req = { url : "http://asdf.com/asdf/1234", method : "GET"};
-        d.dispatch(req, this.res);
+        d.dispatch({req : req, res : this.res});
         this.res.expectEnd("hello world");
     });
-    
+
     it ("throws an exception if the module doesn't implement any methods", function(){
         var d = new Router();
         expectException(
@@ -223,14 +223,14 @@ describe('Router', function(){
         _.isFunction(resource.GET).should.equal(true);
         done();
       });
-      d.route('/', function(req, res){return "hello world";});
+      d.route('/', function(context){return "hello world";});
     });
 
     it ("can route a function as a GET", function(){
         var d = new Router('/api');
         d.route('/', function($){$.res.end("hello world");});
         var req = { url : "http://asdf.com/api", method : "GET"};
-        d.dispatch(req, this.res);
+        d.dispatch({req : req, res : this.res});
         this.res.expectEnd("hello world");
     });
 
@@ -238,7 +238,7 @@ describe('Router', function(){
         var d = new Router('/api');
         d.route('/', { GET : function($){$.res.end("hello world");}});
         var req = { url : "http://asdf.com/api", method : "GET"};
-        d.dispatch(req, this.res);
+        d.dispatch({req : req, res : this.res});
         this.res.expectEnd("hello world");
     });
 
@@ -261,7 +261,7 @@ describe('Router', function(){
         d.route('/', simpleModule);
         d.route('/hello', { GET : function($){$.res.end("hello world");}});
         var req = { url : "http://asdf.com/api/hello", method : "GET"};
-        d.dispatch(req, this.res);
+        d.dispatch({req : req, res : this.res});
         this.res.expectEnd("hello world");
     });
 
@@ -272,7 +272,7 @@ describe('Router', function(){
         d.route('/hello/', { GET : function($){$.res.send("hello world");}});
         d.route('/hello/somenum', { GET : function($){$.res.end("hello world 2");}});
         var req = { url : "http://asdf.com/api/hello/somenum", method : "GET"};
-        d.dispatch(req, this.res);
+        d.dispatch({ req : req, res : this.res});
         this.res.expectEnd("hello world 2");
     });
 
@@ -283,7 +283,7 @@ describe('Router', function(){
         d.route('/hello/', { GET : function($){$.res.send("hello world");}});
         d.route('/hello/*somenum', { GET : function($){$.res.end("hello world 2");}});
         var req = { url : "http://asdf.com/api/hello/1234", method : "GET"};
-        d.dispatch(req, this.res);
+        d.dispatch({req : req, res : this.res});
         this.res.expectEnd("hello world 2");
     });
 
@@ -375,41 +375,21 @@ describe('Router', function(){
 
   describe('#dispatch', function(){
 
-    it ("decorates every request object with the Router object as req.detour by default", 
-        function(){
-          var d = new Router();
-          d.route('/', { POST : function(req, res){return "POST";}});
-          var req = { url : "http://asdf.com/", method : "POST"};
-          d.dispatch(req, this.res);
-          should.exist(req.detour);
-        }
-    );
-    it ("decorates req with the Router object as req[d.requestNamespace]",
-        function(){
-          var d = new Router();
-          d.requestNamespace = "router";
-          d.route('/', { POST : function(req, res){return "POST";}});
-          var req = { url : "http://asdf.com/", method : "POST"};
-          d.dispatch(req, this.res);
-          should.exist(req.router);
-        }
-    );
-
     context("there's no matching route", function(){
       beforeEach(function(){
         this.d = new Router();
         this.req = {url : "http://asdf.com/", method : 'GET'};
       });
       it ("calls the default 404 handler ", function(){
-        this.d.dispatch(this.req, this.res);
+        this.d.dispatch({req : this.req, res : this.res});
         this.res.statusCode.should.equal(404);
         this.res.body.should.equal('');
       });
       it ("calls the on404 handler if it's set", function(done){
-        this.d.on404(function(req, res){
+        this.d.on404(function(context){
           done();
         });
-        this.d.dispatch(this.req, this.res);
+        this.d.dispatch({req : this.req, res : this.res});
       });
     });
 
@@ -423,13 +403,13 @@ describe('Router', function(){
         this.req = { url : bigurl, method : "PUT"};
       });
       it ("calls the default 414 handler", function(){
-        this.d.dispatch(this.req, this.res);
+        this.d.dispatch({req : this.req, res : this.res});
         this.res.expectStatus(414);
       });
 
       it ("calls the on414 handler if it's set", function(done){
-        this.d.on414(function(req, res){ done(); });
-        this.d.dispatch(this.req, this.res);
+        this.d.on414(function(context){ done(); });
+        this.d.dispatch({req : this.req, res : this.res});
       });
 
     });
@@ -439,18 +419,18 @@ describe('Router', function(){
         this.d = new Router();
         var simpleModule = this.simpleModule;
         this.d.route('/', simpleModule);
-        this.d.route('/hello', { GET : function(req, res){res.send("hello world");}});
+        this.d.route('/hello', { GET : function(context){res.send("hello world");}});
         this.req = { url : "http://asdf.com/hello", method : "PUT"};
 
       });
       it ("calls the default 405 handler", function(){
-        this.d.dispatch(this.req, this.res);
+        this.d.dispatch({req : this.req, res : this.res});
         this.res.expectStatus(405);
         this.res.expectHeader('Allow', 'OPTIONS,GET,HEAD');
       });
       it ("calls the on405 handler if it's set", function(done){
-        this.d.on405(function(req, res){ done(); });
-        this.d.dispatch(this.req, this.res);
+        this.d.on405(function(context){ done(); });
+        this.d.dispatch({req : this.req, res : this.res});
       });
 
     });
@@ -459,16 +439,21 @@ describe('Router', function(){
         this.d = new Router();
         var simpleModule = this.simpleModule;
         this.d.route('/', simpleModule);
-        this.d.route('/fail', { GET : function(req, res){ throw 'wthizzle';}});
+        this.d.route('/fail', { GET : function(context){ throw 'wthizzle';}});
         this.req = { url : "http://asdf.com/fail", method : "GET"};
       });
       it ("calls the default 500 handler", function(){
-        this.d.dispatch(this.req, this.res);
+        this.d.dispatch({req : this.req, res : this.res});
         this.res.expectStatus(500);
       });
       it ("calls the on500 handler if it's set", function(done){
-        this.d.on500(function(req, res){ done(); });
-        this.d.dispatch(this.req, this.res);
+        this.d.on500(function(context, err){ 
+          should.exist(context.req);
+          should.exist(context.res);
+          err.should.equal("wthizzle");
+          done();
+        });
+        this.d.dispatch({req : this.req, res : this.res});
       });
     });
 
@@ -477,30 +462,30 @@ describe('Router', function(){
         this.d = new Router();
         var simpleModule = this.simpleModule;
         this.d.route('/', simpleModule);
-        this.d.route('/hello', { GET : function(req, res){res.send("hello world");}});
+        this.d.route('/hello', { GET : function(context){res.send("hello world");}});
         this.req = { url : "http://asdf.com/hello", method : "TRACE"};
       });
       it ("calls the default 501 handler", function(){
-        this.d.dispatch(this.req, this.res);
+        this.d.dispatch({req : this.req, res : this.res});
         this.res.expectStatus(501);
       });
       it ("calls the on501 handler if it's set", function(done){
-        this.d.on501(function(req, res){ done(); });
-        this.d.dispatch(this.req, this.res);
+        this.d.on501(function(context){ done(); });
+        this.d.dispatch({req : this.req, res : this.res});
       });
     });
     it ("can route an object with a POST", function(){
         var d = new Router();
         d.route('/', { POST : function($){$.res.end("POST");}});
         var req = { url : "http://asdf.com/", method : "POST"};
-        d.dispatch(req, this.res);
+        d.dispatch({req : req, res : this.res});
         this.res.expectEnd("POST");
     });
     it ("can dispatch a url with a querystring", function(){
         var d = new Router();
         d.route('/', { GET : function($){$.res.end("GET");}});
         var req = { url : "http://asdf.com/?asdf=1234", method : "GET"};
-        d.dispatch(req, this.res);
+        d.dispatch({req : req, res : this.res});
         this.res.expectEnd("GET");
     });
 
@@ -509,14 +494,14 @@ describe('Router', function(){
       it ("404s if the resource doesn't exist", function(){
           var d = new Router();
           var req = { url : "http://asdf.com/asdf", method : "OPTIONS"};
-          d.dispatch(req, this.res);
+          d.dispatch({req : req, res : this.res});
           this.res.expectStatus(404);
       });
       it ("405s if the resource has no GET", function(){
           var d = new Router();
           d.route('/', { POST : function(context){return "POST";}});
           var req = { url : "http://asdf.com/", method : "HEAD"};
-          d.dispatch(req, this.res);
+          d.dispatch({req : req, res : this.res});
           this.res.expectStatus(405);
       });
       it ("204s (no body) if the resource has a GET", function(){
@@ -527,10 +512,11 @@ describe('Router', function(){
                         }});
           var req = { url : "http://asdf.com/", method : "HEAD"};
           try {
-            d.handle500 = function(req, res, ex){
+            d.handle500 = function(context, ex){
               console.log(ex);
             };
-            d.dispatch(req, this.res);
+            context = { req : req, res : this.res };
+            d.dispatch(context);
           } catch (ex){
             console.log(ex);
           }
@@ -543,7 +529,7 @@ describe('Router', function(){
       it ("404s if the resource doesn't exist", function(){
           var d = new Router();
           var req = { url : "http://asdf.com/asdf", method : "OPTIONS"};
-          d.dispatch(req, this.res);
+          d.dispatch({ req : req, res : this.res });
           this.res.expectStatus(404);
       });
       context("when the resource exists", function(){
@@ -553,18 +539,19 @@ describe('Router', function(){
                                 context.res.end("GET output");
                           }});
           this.req = { url : "http://asdf.com/", method : "OPTIONS"};
+          this.context = { req : this.req, res : this.res };
         
         });
         it ("sets the proper headers for OPTIONS", function(){
-            this.d.dispatch(this.req, this.res);
+            this.d.dispatch(this.context);
             this.res.expectStatus(204);
             this.res.expectHeader('Allow', 'OPTIONS,GET,HEAD');
         });
         it ("calls the onOPTIONS handler if it was set.", function(done){
-          this.d.onOPTIONS(function(req, res){
+          this.d.onOPTIONS(function(context){
             done();
           });
-          this.d.dispatch(this.req, this.res);
+          this.d.dispatch(this.context);
         });
       });
     });
@@ -577,12 +564,12 @@ describe('Router', function(){
                               GET : function(context){
                                 context.res.end("GET output 2");
                               },
-                              DELETE : function(req, res){
+                              DELETE : function(context){
                                 context.res.end("delete");
                               }
                             });
           var req = { url : "http://asdf.com/subpath", method : "OPTIONS"};
-          d.dispatch(req, this.res);
+          d.dispatch({req : req, res : this.res});
           this.res.expectStatus(204);
           this.res.expectHeader('Allow', 'OPTIONS,DELETE,GET,HEAD');
     });
@@ -601,11 +588,11 @@ describe('Router', function(){
     });
     it ("gets child urls for a parent path correctly", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }});
-          d.route('/asdf', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/asdf', { GET : function(context){
+                              context.res.end("GET output");
                         }});
           var urls = d.getChildUrls('http://asdf.com');
           var keys = _.keys(urls);
@@ -615,11 +602,11 @@ describe('Router', function(){
     });
     it ("gets child urls for a parent path correctly when given just the path", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }});
-          d.route('/asdf', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/asdf', { GET : function(context){
+                              context.res.end("GET output");
                         }});
           var urls = d.getChildUrls('/');
           var keys = _.keys(urls);
@@ -629,14 +616,14 @@ describe('Router', function(){
     });
     it ("gets multiple child urls for a parent path", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }});
-          d.route('/asdf', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/asdf', { GET : function(context){
+                              context.res.end("GET output");
                         }});
-          d.route('/other', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/other', { GET : function(context){
+                              context.res.end("GET output");
                         }});
           var urls = d.getChildUrls('http://asdf.com');
           var keys = _.keys(urls);
@@ -648,14 +635,14 @@ describe('Router', function(){
     });
     it ("doesn't get grandkids", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }});
-          d.route('/asdf', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/asdf', { GET : function(context){
+                              context.res.end("GET output");
                         }});
-          d.route('/asdf/grankid', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/asdf/grankid', { GET : function(context){
+                              context.res.end("GET output");
                         }});
 
           var urls = d.getChildUrls('http://asdf.com');
@@ -666,11 +653,11 @@ describe('Router', function(){
     });
     it ("doesn't get starRoutes", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }});
-          d.route('/*asdf', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/*asdf', { GET : function(context){
+                              context.res.end("GET output");
                         }});
           var urls = d.getChildUrls('http://asdf.com');
           var keys = _.keys(urls);
@@ -679,14 +666,14 @@ describe('Router', function(){
 
     it ("can get children of starRoutes", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }}).as('root');
-          d.route('/*asdf', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/*asdf', { GET : function(context){
+                              context.res.end("GET output");
                         }}).as('asdf*');
-          d.route('/*asdf/grandkid', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/*asdf/grandkid', { GET : function(context){
+                              context.res.end("GET output");
                         }}).as('grandkid');
           var urls = d.getChildUrls('http://asdf.com/1234');
           var keys = _.keys(urls);
@@ -696,14 +683,14 @@ describe('Router', function(){
 
     it ("can get children of starRoutes when the root path is not /", function(){
           var d = new Router('/somepath');
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }}).as('root');
-          d.route('/*asdf', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/*asdf', { GET : function(context){
+                              context.res.end("GET output");
                         }}).as('asdf*');
-          d.route('/*asdf/grandkid', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/*asdf/grandkid', { GET : function(context){
+                              context.res.end("GET output");
                         }}).as('grandkid');
           var urls = d.getChildUrls('http://asdf.com/somepath/1234');
           var keys = _.keys(urls);
@@ -713,14 +700,14 @@ describe('Router', function(){
 
     it ("populates the names of child routes where possible", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }}).as('root');
-          d.route('/asdf', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/asdf', { GET : function(context){
+                              context.res.end("GET output");
                         }}).as('asdf*');
-          d.route('/asdf/grandkid', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/asdf/grandkid', { GET : function(context){
+                              context.res.end("GET output");
                         }}).as('grandkid');
           var urls = d.getChildUrls('http://asdf.com/asdf');
           var keys = _.keys(urls);
@@ -731,14 +718,14 @@ describe('Router', function(){
 
     it ("populates the names of child routes of starRoutes where possible", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }}).as('root');
-          d.route('/*asdf', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/*asdf', { GET : function(context){
+                              context.res.end("GET output");
                         }}).as('asdf*');
-          d.route('/*asdf/grandkid', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/*asdf/grandkid', { GET : function(context){
+                              context.res.end("GET output");
                         }}).as('grandkid');
           var urls = d.getChildUrls('http://asdf.com/1234');
           var keys = _.keys(urls);
@@ -751,14 +738,14 @@ describe('Router', function(){
 
   describe('#getNamedChildUrls', function(){
     var d = new Router();
-    d.route('/', { GET : function(req, res){
-                        res.end("GET output");
+    d.route('/', { GET : function(context){
+                        context.res.end("GET output");
                   }}).as('root');
-    d.route('/asdf', { GET : function(req, res){
-                        res.end("GET output");
+    d.route('/asdf', { GET : function(context){
+                        context.res.end("GET output");
                   }}).as('asdf');
-    d.route('/qwerty', { GET : function(req, res){
-                        res.end("GET output");
+    d.route('/qwerty', { GET : function(context){
+                        context.res.end("GET output");
                   }});  // this one is not named
     var urls = d.getNamedChildUrls('http://asdf.com/');
     var keys = _.keys(urls);
@@ -771,8 +758,8 @@ describe('Router', function(){
 	describe('#getParentUrl', function(){
     it ("throws an exception when getting the parent url of a root node", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }});
           expectException(function(){
               d.getParentUrl('http://asdf.com');
@@ -780,36 +767,36 @@ describe('Router', function(){
     });
     it ("returns the parent url for a child path correctly", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }});
-          d.route('/asdf', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/asdf', { GET : function(context){
+                              context.res.end("GET output");
                         }});
           var url = d.getParentUrl('http://asdf.com/asdf');
           url.should.equal('/');
     });
     it ("returns the parent url for a child path correctly with just a path", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }});
-          d.route('/asdf', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/asdf', { GET : function(context){
+                              context.res.end("GET output");
                         }});
           var url = d.getParentUrl('/asdf');
           url.should.equal('/');
     });
     it ("returns the parent url for a grandchild path correctly", function(){
           var d = new Router();
-          d.route('/', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
                         }});
-          d.route('/asdf', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/asdf', { GET : function(context){
+                              context.res.end("GET output");
                         }});
-          d.route('/asdf/grandkid', { GET : function(req, res){
-                              res.end("GET output");
+          d.route('/asdf/grandkid', { GET : function(context){
+                              context.res.end("GET output");
                         }});
           var url = d.getParentUrl('http://asdf.com/asdf/grandkid');
           url.should.equal('/asdf');

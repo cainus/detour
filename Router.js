@@ -27,8 +27,8 @@ Router.prototype = Object.create(events.EventEmitter.prototype);
 
 _.each([414, 404, 405, 501, 500, 'OPTIONS'], function(type){
   Router.prototype['on' + type] = function(handler){  
-    this['handle' + type] = function(req, res){
-      handler(req, res);
+    this['handle' + type] = function(context, err){
+      handler(context, err);
     };
   } ;
 });
@@ -83,27 +83,29 @@ Router.prototype.pathVariables = function(url){
 };
 
 
-Router.prototype.onRequest = function(handler, req, res, cb){
+Router.prototype.onRequest = function(handler, cb){
   // do nothing by default
   // can be overridden though
   cb(null, handler);
 };
 
-Router.prototype.dispatch = function(req, res){
-  req[this.requestNamespace] = this;
+Router.prototype.dispatch = function(context){
+  // "context" is any object with req and res properties 
+  // on them representing an HTTP request and response.
+  var url = context.req.url;
   var that = this;
   var handler;
   var route;
   try {
-    route = this.routeTree.get(req.url);
+    route = this.routeTree.get(url);
   } catch (ex){
     switch(ex){
       case "Not Found" :
         try { 
-          route = this.freeRoutes.get(req.url);
+          route = this.freeRoutes.get(url);
         } catch (ex){
           if (ex === "Not Found"){
-              return this.handle404(req, res);
+              return this.handle404(context);
           } else {
             console.log("unknown route error: ");
             console.log(ex);
@@ -113,40 +115,47 @@ Router.prototype.dispatch = function(req, res){
         }
         break;
       case "URI Too Long" :
-        return this.handle414(req, res);
+        return this.handle414(context);
       default :
         throw ex;
     }
   }
   handler = route.handler;
 
-  var method = req.method;
+  var method = context.req.method;
   if (!_.include(serverSupportedMethods, method)){
     // node.js currently will disconnect clients requesting methods
     // that it doesn't recognize, so we can't properly 501 on those.
     // We can 501 on ones we don't support (that node does) that 
     // make it through though.
-    return this.handle501(req, res);
+    return this.handle501(context);
   }
   if (!handler[method]){
-    return this.handle405(req, res);
+    return this.handle405(context);
   }
   try {
-      return handle(that, handler, method, req, res);
+      return handle(that, handler, context, method);
   } catch(ex){
-    this.handle500(req, res, ex);
+    this.handle500(context, ex);
   }
 };
 
-var handle = function(router, handler, method, req, res){
+var handle = function(router, handler, context, methodOverride){
+  // 'methodOverride' may be an override
+  // for what's already on context.req.method.  
+  // For example, HEAD requests will be treated 
+  // as GET.
+  var method = methodOverride || context.req.method;
+
+  // Clone the handler, and mix-in the context properties
+  // (req, res)
   var handlerObj = _.clone(handler);
-  router.onRequest(handlerObj, req, res, function(err, newHandlerObj){
+  handlerObj = _.extend(handlerObj, context);
+  router.onRequest(handlerObj, function(err, newHandlerObj){
     if (!err){
-      handlerObj.req = req;
-      handlerObj.res = res;
-      return newHandlerObj[method](handlerObj);
+      return newHandlerObj[method](newHandlerObj);
     } else {
-      this.handle500(req, res, err);
+      this.handle500(handlerObj, err);
     }
   });
 };
@@ -280,12 +289,12 @@ Router.prototype.route = function(inPath, handler, free){
   // add handler for HEAD if it doesn't exist
   if (!handler.HEAD && !!handler.GET){
     handler.HEAD = function(context){
-      that.handleHEAD(context.req, context.res); 
+      that.handleHEAD(context); 
     };
   }
   // add handler for OPTIONS if it doesn't exist
   if (!handler.OPTIONS){
-    handler.OPTIONS = function(context){ that.handleOPTIONS(context.req, context.res); };
+    handler.OPTIONS = function(context){ that.handleOPTIONS(context); };
   }
 
   if (free){
@@ -302,46 +311,47 @@ Router.prototype.route = function(inPath, handler, free){
   return chainObject;
 };
 
-Router.prototype.handle414 = function(req, res){
-  res.writeHead(414);
-  res.end();
+Router.prototype.handle414 = function(context){
+  context.res.writeHead(414);
+  context.res.end();
 };
 
-Router.prototype.handle404 = function(req, res){
-  res.writeHead(404);
-  res.end();
+Router.prototype.handle404 = function(context){
+  context.res.writeHead(404);
+  context.res.end();
 };
 
-Router.prototype.handle405 = function(req, res){
-  res.writeHead(405);
-  this.setAllowHeader(req, res);
-  res.end();
+Router.prototype.handle405 = function(context){
+  context.res.writeHead(405);
+  this.setAllowHeader(context);
+  context.res.end();
 };
 
-Router.prototype.setAllowHeader = function(req, res){
-  res.setHeader('Allow', allowHeader(this, req.url));
+Router.prototype.setAllowHeader = function(context){
+  context.res.setHeader('Allow', allowHeader(this, context.req.url));
 };
 
-Router.prototype.handle501 = function(req, res){
-  res.writeHead(501);
-  res.end();
+Router.prototype.handle501 = function(context){
+  context.res.writeHead(501);
+  context.res.end();
 };
 
-Router.prototype.handle500 = function(req, res, ex){
-  res.writeHead(500);
-  res.end();
+Router.prototype.handle500 = function(context, ex){
+  context.res.writeHead(500);
+  context.res.end();
 };
 
-Router.prototype.handleOPTIONS = function(req, res){
-  res.writeHead(204);
-  this.setAllowHeader(req, res);
-  res.end();
+Router.prototype.handleOPTIONS = function(context){
+  context.res.writeHead(204);
+  this.setAllowHeader(context);
+  context.res.end();
 };
 
-Router.prototype.handleHEAD = function(req, res){
-  var handler = this.getHandler(req.url);
+Router.prototype.handleHEAD = function(context){
+  var res = context.res;
+  var handler = this.getHandler(context.req.url);
   if (!handler.GET){
-    return this.handle405(req, res);
+    return this.handle405(context);
   }
   res.origEnd = res.end;
   res.end = function(){
@@ -358,7 +368,7 @@ Router.prototype.handleHEAD = function(req, res){
     }
   };
   res.statusCode = 204;
-  handle(this, handler, 'GET', req, res);
+  handle(this, handler, context, 'GET');
 };
 
 
