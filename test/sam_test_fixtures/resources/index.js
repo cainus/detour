@@ -13,10 +13,9 @@ exports.handler = {
 
 
 
-exports.member = {
+exports.wildcard = {
 
   GET : function($){
-    console.log($.req.detour.routeTree);
     console.log($.req.url);
     console.log("member");
     $.res.end('{"many" : "http://localhost:9999/1234/many"}');

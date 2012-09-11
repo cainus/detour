@@ -6,7 +6,7 @@ exports.handler = {
 
 };
 
-exports.member = {
+exports.wildcard = {
 
   GET : function($){
     $.res.end("MANY MEMBER!!");
