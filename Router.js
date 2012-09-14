@@ -80,10 +80,10 @@ Router.prototype.pathVariables = function(url){
 };
 
 
-Router.prototype.onRequest = function(handler, cb){
+Router.prototype.onRequest = function(handler, context, cb){
   // do nothing by default
   // can be overridden though
-  cb(null, handler);
+  cb(null, context);
 };
 
 Router.prototype.dispatch = function(context){
@@ -147,12 +147,11 @@ var handle = function(router, handler, context, methodOverride){
   // Clone the handler, and mix-in the context properties
   // (req, res)
   var handlerObj = _.clone(handler);
-  handlerObj = _.extend(handlerObj, context);
-  router.onRequest(handlerObj, function(err, newHandlerObj){
+  router.onRequest(handlerObj, context, function(err, newContext){
     if (!err){
-      return newHandlerObj[method](newHandlerObj);
+      return handlerObj[method](newContext);
     } else {
-      this.handle500(handlerObj, err);
+      this.handle500(newContext, err);
     }
   });
 };

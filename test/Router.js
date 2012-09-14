@@ -69,11 +69,11 @@ describe('Router', function(){
   describe('#onRequest', function(){
     it ("can be overridden to decorate the resource object", function(){
         var d = new Router('/api');
-        d.onRequest = function(resource, cb){
-          resource.url = resource.req.url;
-          cb(null, resource);
+        d.onRequest = function(resource, context, cb){
+          context.url = context.req.url;
+          cb(null, context);
         };
-        d.route('/', {GET : function($){$.res.end("hello world: " + this.url);}});
+        d.route('/', {GET : function($){$.res.end("hello world: " + $.url);}});
         var req = { url : "http://asdf.com/api", method : "GET"};
         d.dispatch({ req : req, res : this.res});
         this.res.expectEnd("hello world: http://asdf.com/api");
