@@ -67,7 +67,7 @@ describe('Router', function(){
 	});
 
   describe('#onRequest', function(){
-    it ("can be overridden to decorate the resource object", function(){
+    it ("can be overridden to decorate the context object", function(){
         var d = new Router('/api');
         d.onRequest = function(resource, context, cb){
           context.url = context.req.url;
@@ -77,6 +77,25 @@ describe('Router', function(){
         var req = { url : "http://asdf.com/api", method : "GET"};
         d.dispatch({ req : req, res : this.res});
         this.res.expectEnd("hello world: http://asdf.com/api");
+    });
+  });
+
+  describe('#setResourceDecorator', function(){
+   it ("can be used to decorate the resource object", function(done){
+      var d = new Router();
+      d.setResourceDecorator(function(resource){
+        should.exist(resource.GET);
+        _.isFunction(resource.GET).should.equal(true);
+        resource.decorated = true;
+        return resource;
+      });
+      d.freeRoute('/asdf/:asdf_id', function($){ 
+        $.res.end("hello world" + this.decorated);
+        done();
+      });
+      var req = { url : "http://asdf.com/asdf/1234", method : "GET"};
+      d.dispatch({ req : req, res : this.res});
+      this.res.expectEnd("hello worldtrue");
     });
   });
 

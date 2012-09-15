@@ -19,6 +19,7 @@ function Router(path){
   this.names = {};
   this.requestNamespace = 'detour';  // req.detour will have this object
   var that = this;
+  this.resourceDecorator = function(handler){ return handler; };
 
 }
 
@@ -79,11 +80,12 @@ Router.prototype.pathVariables = function(url){
   return retval;
 };
 
-
-Router.prototype.onRequest = function(handler, context, cb){
-  // do nothing by default
-  // can be overridden though
-  cb(null, context);
+// takes a function called 'decorator'
+// decorator should be a function itself.
+// decorator's input should be a resource
+// decorator should return a resource
+Router.prototype.setResourceDecorator = function(decorator){
+  this.resourceDecorator = decorator;
 };
 
 Router.prototype.dispatch = function(context){
@@ -251,6 +253,12 @@ Router.prototype.getUrl = function(path, var_map){
   return path;
 };
 
+Router.prototype.onRequest = function(handler, context, cb){
+  // do nothing by default
+  // can be overridden though
+  cb(null, context);
+};
+
 
 Router.prototype.freeRoute = function(path, handler){
   this.route(path, handler, true);
@@ -293,10 +301,12 @@ Router.prototype.route = function(inPath, handler, free){
     handler.OPTIONS = function(context){ that.handleOPTIONS(context); };
   }
 
+  var newHandler = this.resourceDecorator(handler);
+
   if (free){
-    this.freeRoutes.set(inPath, handler);
+    this.freeRoutes.set(inPath, newHandler);
   } else {
-    this.routeTree.set(path, handler);
+    this.routeTree.set(path, newHandler);
   }
 
   // A call to route() will return an object with a function 'as' for
