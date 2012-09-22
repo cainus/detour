@@ -1,4 +1,5 @@
 var _ = require('underscore');
+var fs = require('fs');
 var DetourError = require('./DetourError').DetourError;
 var FSRouteLoader = require('./SamFSRouteLoader').SamFSRouteLoader;
 var url = require('url');
@@ -8,6 +9,7 @@ var serverSupportedMethods = ["GET", "POST",
                               "HEAD", "OPTIONS"];
 var RouteTree = require('./RouteTree').RouteTree;
 var FreeRouteCollection = require('./FreeRouteCollection');
+var staticMiddleware = require('connect')['static'];
 // TODO use freeRoutes everywhere!!
 
 function Router(path){
@@ -17,6 +19,7 @@ function Router(path){
   this.freeRoutes = new FreeRouteCollection();
   this.routes = {};
   this.names = {};
+  this.staticDir = null;
   this.requestNamespace = 'detour';  // req.detour will have this object
   var that = this;
   this.resourceDecorator = function(handler){ return handler; };
@@ -88,13 +91,27 @@ Router.prototype.setResourceDecorator = function(decorator){
   this.resourceDecorator = decorator;
 };
 
+
 Router.prototype.dispatch = function(context){
+  var that = this;
+  if (!!this.staticDir){
+    staticMiddleware(this.staticDir)(context.req, context.res, function(){
+      that.dynamicDispatch(context);
+    });
+  } else {
+    that.dynamicDispatch(context);
+  }
+};
+
+
+Router.prototype.dynamicDispatch = function(context){
   // "context" is any object with req and res properties 
   // on them representing an HTTP request and response.
   var url = context.req.url;
   var that = this;
   var handler;
   var route;
+
   try {
     route = this.routeTree.get(url);
   } catch (ex){
@@ -262,6 +279,18 @@ Router.prototype.onRequest = function(handler, context, cb){
 
 Router.prototype.freeRoute = function(path, handler){
   this.route(path, handler, true);
+};
+
+Router.prototype.staticRoute = function(path, cb){
+  var that = this;
+  dirExists(path, function(exists){
+    if (exists){
+      that.staticDir = path;
+      cb();
+    } else {
+      cb("static directory does not exist: ", path);
+    }
+  });
 };
 
 Router.prototype.route = function(inPath, handler, free){
@@ -477,4 +506,8 @@ var removePrefix = function(str, prefix){
   if (startsWith(str, prefix)){
     return str.substring(prefix.length);
   }
+};
+
+var dirExists = function(d, cb) {
+  fs.stat(d, function (er, s) { cb(!er && s.isDirectory()); });
 };

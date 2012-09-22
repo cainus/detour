@@ -192,6 +192,28 @@ describe('Router', function(){
     });
   });
 
+	describe('#staticRoute', function(){
+    it ("errors if the dir doesn't exist", function(done){
+        var d = new Router('/api');
+        var dir = __dirname + '/sam_test_fixtures/NO_EXIST/';
+        d.staticRoute(dir, function(err){
+          err.should.equal("static directory does not exist: ");
+          done();
+        });
+    });
+    it ("sets the staticDir property", function(done){
+        var d = new Router('/api');
+        var dir = __dirname + '/sam_test_fixtures/static/';
+        d.staticRoute(dir, function(err){
+          should.not.exist(err);
+          d.staticDir.should.equal(dir);
+          done();
+        });
+
+    });
+
+  });
+
 	describe('#freeRoute', function(){
 
     it ("can route a function as a GET", function(done){
