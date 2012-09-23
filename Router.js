@@ -170,7 +170,7 @@ var handle = function(router, handler, context, methodOverride){
     if (!err){
       return handlerObj[method](newContext);
     } else {
-      this.handle500(newContext, err);
+      router.handle500(newContext, err); // TODO: get under test
     }
   });
 };
