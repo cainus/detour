@@ -3,7 +3,7 @@ var Router = require('./detour').Router;
 var router = new Router();
 //var exampleResource = {GET : function(req, res){res.end("test");}};
 
-router.freeRoute('/cross/:fingers_id', function($){ $.res.end("it worked!"); });
+router.route('/cross/:fingers_id', function($){ $.res.end("it worked!"); });
 router.staticRoute('./test/sam_test_fixtures/static', function(){
 
   router.routeDirectory('./test/sam_test_fixtures/resources', function(err){

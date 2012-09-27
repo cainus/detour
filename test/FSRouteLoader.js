@@ -2,7 +2,7 @@ var should = require('should');
 var hottap = require('hottap').hottap;
 var _ = require('underscore');
 var Router = require('../Router').Router;
-var SamFSRouteLoader = require('../SamFSRouteLoader').SamFSRouteLoader;
+var FSRouteLoader = require('../FSRouteLoader').FSRouteLoader;
 
 var getSimpleModule = function(fullpath){
   return { module : { handler : {GET : function(req, res){res.end(fullpath);} } },
@@ -21,37 +21,20 @@ var getCollectionModule = function(fullpath){
          };
 };
 
-describe('SamFSRouteLoader', function(){
+describe('FSRouteLoader', function(){
 	beforeEach(function(){
     this.router = new Router();
     this.dir = __dirname + '/test_fixtures/resources';
-    this.loader = new SamFSRouteLoader(this.router, this.dir);
+    this.loader = new FSRouteLoader(this.router, this.dir);
 	});
 	afterEach(function(){
 	});
 
 
-  // TODO : autoname should not work without knowing if each item is a 
-  // collection or not and if the last one should be treated like one.
-  // Therefore, autname, requires something to already be routed.
-  /*
-  describe("#autoName", function(){
-    it ("names a root path properly", function(){
-      this.loader.autoName('/index.js').should.equal('root');
-    });
-    it ("names a root child path properly", function(){
-      this.loader.autoName('/artist.js').should.equal('artist');
-    });
-    it ("names a double star path properly", function(){
-      this.loader.autoName('/artist/_artist/song/_song.js').should.equal('artist*song*');
-    });
-  });*/
-
-
   describe("#route", function(){
 
     it ("returns an error when the resource directory doesn't exist", function(done){
-      var loader = new SamFSRouteLoader(this.router, 'NOEXISTtest_fixtures');
+      var loader = new FSRouteLoader(this.router, 'NOEXISTtest_fixtures');
       loader.load(function(err){
         should.exist(err);
         err.name.should.equal('InvalidDirectory');
@@ -83,7 +66,7 @@ describe('SamFSRouteLoader', function(){
       var that = this;
       this.loader.load(function(err){
         should.not.exist(err);
-        that.router.getUrl('root').should.equal('/');
+        that.router.getUrl('/').should.equal('/');
         done();
       });
     });
@@ -99,13 +82,12 @@ describe('SamFSRouteLoader', function(){
       var that = this;
       this.loader.load(function(err){
         should.not.exist(err);
-        that.router.getUrl('root').should.equal('/');
-        that.router.getUrl('song').should.equal('/song');
-        that.router.getUrl('band').should.equal('/band');
+        that.router.getUrl('/').should.equal('/');
+        that.router.getUrl('/song').should.equal('/song');
+        that.router.getUrl('/band').should.equal('/band');
         done();
       });
     });
-   
 
     it ("returns an error if there's a dir with no module for it", function(done){
       this.loader.requirer.require = function(cb){
@@ -136,8 +118,8 @@ describe('SamFSRouteLoader', function(){
       var that = this;
       this.loader.load(function(err){
         should.not.exist(err);
-        that.router.getUrl('root').should.equal('/');
-        that.router.getUrl('song').should.equal('/song');
+        that.router.getUrl('/').should.equal('/');
+        that.router.getUrl('/song').should.equal('/song');
         done();
       });
     });
@@ -155,9 +137,8 @@ describe('SamFSRouteLoader', function(){
       var that = this;
       this.loader.load(function(err){
         should.not.exist(err);
-        that.router.getUrl('root').should.equal('/');
-        that.router.getUrl('song').should.equal('/song');
-        that.router.getUrl('songArtist').should.equal('/song/artist');
+        that.router.getUrl('/').should.equal('/');
+        that.router.getUrl('/song').should.equal('/song');
         that.router.getUrl('/song/artist').should.equal('/song/artist');
         done();
       });
@@ -174,10 +155,9 @@ describe('SamFSRouteLoader', function(){
       var that = this;
       this.loader.load(function(err){
         should.not.exist(err);
-        that.router.getUrl('root').should.equal('/');
-        that.router.getUrl('song').should.equal('/song');
-        that.router.getUrl('/song/*song', {song : 1234}).should.equal('/song/1234');
-        that.router.getUrl('song*', {song : 1234}).should.equal('/song/1234');
+        that.router.getUrl('/').should.equal('/');
+        that.router.getUrl('/song').should.equal('/song');
+        that.router.getUrl('/song/:song', {song : 1234}).should.equal('/song/1234');
         done();
       });
     });
@@ -186,22 +166,18 @@ describe('SamFSRouteLoader', function(){
       this.loader.requirer.require = function(cb){
         this.paths = {
                       '/index.js' : getCollectionModule('/asdf/index.js'),
-                      '/artist.js' : getCollectionModule('/asdf/artist.js'),
-                      '/artist/song.js' : getCollectionModule('/asdf/artist/song.js')
+                      '/artist.js' : getCollectionModule('/asdf/artist.js')
                     };
         cb();
       };
       var that = this;
       this.loader.load(function(err){
         should.not.exist(err);
-        that.router.getUrl('root').should.equal('/');
-        that.router.getUrl('root*', {root : 4567}).should.equal('/4567');
-        that.router.getUrl('/*root', {root : 4567}).should.equal('/4567');
-        that.router.getUrl('/*root/artist', {root : 1234}).should.equal('/1234/artist');
-        that.router.getUrl('root*artist', {root : 1234})
-                                            .should.equal('/1234/artist');
-        that.router.getUrl('/*root/artist/*artist', {root : 5678, artist : 1234}).should.equal('/5678/artist/1234');
-        that.router.getUrl('root*artist*', {root : 5678, artist : 1234}).should.equal('/5678/artist/1234');
+        that.router.getUrl('/').should.equal('/');
+        that.router.getUrl('/:root', {root : 4567});
+        that.router.getUrl('/:root', {root : 4567}).should.equal('/4567');
+        that.router.getUrl('/:root/artist', {root : 1234}).should.equal('/1234/artist');
+        that.router.getUrl('/:root/artist/:artist', {root : 5678, artist : 1234}).should.equal('/5678/artist/1234');
         done();
       });
     });
@@ -217,8 +193,8 @@ describe('SamFSRouteLoader', function(){
       var that = this;
       this.loader.load(function(err){
         should.not.exist(err);
-        that.router.getUrl('root').should.equal('/');
-        that.router.getUrl('/*root', {root : 1234}).should.equal('/1234');
+        that.router.getUrl('/').should.equal('/');
+        that.router.getUrl('/:root', {root : 1234}).should.equal('/1234');
         done();
       });
     });
@@ -226,30 +202,25 @@ describe('SamFSRouteLoader', function(){
     it ("can nest collection modules", function(done){
       this.router = new Router("/sub");  // set the router's path.  this is key.
       this.dir = __dirname + '/test_fixtures/resources';
-      this.loader = new SamFSRouteLoader(this.router, this.dir);
+      this.loader = new FSRouteLoader(this.router, this.dir);
 
       this.loader.requirer.require = function(cb){
         this.paths = {
                       '/index.js' : getSimpleModule('/asdf/index.js'),
                       '/artist.js' : getCollectionModule('/asdf/artist.js'),
-                      '/artist/song.js' : getCollectionModule('/asdf/artist/*artist/song.js')
+                      '/artist/song.js' : getCollectionModule('/asdf/artist/:artist/song.js')
                     };
         cb();
       };
       var that = this;
       this.loader.load(function(err){
         should.not.exist(err);
-        that.router.getUrl('root').should.equal('/sub');
-        that.router.getUrl('artist').should.equal('/sub/artist');
-        that.router.getUrl('/sub/artist/*artist', {artist : 1234}).should.equal('/sub/artist/1234');
-        that.router.getUrl('artist*', {artist : 1234}).should.equal('/sub/artist/1234');
-        that.router.getUrl('/sub/artist/*artist/song', {artist : 1234})
+        that.router.getUrl('/sub').should.equal('/sub');
+        that.router.getUrl('/sub/artist').should.equal('/sub/artist');
+        that.router.getUrl('/sub/artist/:artist', {artist : 1234}).should.equal('/sub/artist/1234');
+        that.router.getUrl('/sub/artist/:artist/song', {artist : 1234})
                             .should.equal('/sub/artist/1234/song');
-        that.router.getUrl('artist*song', {artist : 1234})
-                            .should.equal('/sub/artist/1234/song');
-        that.router.getUrl('/sub/artist/*artist/song/*song', {artist : 1234, song : 5678})
-                            .should.equal('/sub/artist/1234/song/5678');
-        that.router.getUrl('artist*song*', {artist : 1234, song : 5678})
+        that.router.getUrl('/sub/artist/:artist/song/:song', {artist : 1234, song : 5678})
                             .should.equal('/sub/artist/1234/song/5678');
         done();
       });
@@ -265,10 +236,10 @@ describe('SamFSRouteLoader', function(){
       var that = this;
       this.loader.load(function(err){
         should.not.exist(err);
-        that.router.getUrl('root').should.equal('/');
-        that.router.getUrl('/*root', {root : 1234}).should.equal('/1234');
-        that.router.getUrl('/*root/artist', {root : 1234}).should.equal('/1234/artist');
-        that.router.getUrl('/*root/artist/*artist', {root : 1234, artist : 5678}).should.equal('/1234/artist/5678');
+        that.router.getUrl('/').should.equal('/');
+        that.router.getUrl('/:root', {root : 1234}).should.equal('/1234');
+        that.router.getUrl('/:root/artist', {root : 1234}).should.equal('/1234/artist');
+        that.router.getUrl('/:root/artist/:artist', {root : 1234, artist : 5678}).should.equal('/1234/artist/5678');
         should.exist(that.router.getHandler('/'));
         should.exist(that.router.getHandler('/1234/artist'));
         should.exist(that.router.getHandler('/1234/artist/9876'));
@@ -280,7 +251,7 @@ describe('SamFSRouteLoader', function(){
     it ("can route a root collection when the router's path is set", function(done){
       this.router = new Router("/sub");  // set the router's path.  this is key.
       this.dir = __dirname + '/test_fixtures/resources';
-      this.loader = new SamFSRouteLoader(this.router, this.dir);
+      this.loader = new FSRouteLoader(this.router, this.dir);
       this.loader.requirer.require = function(cb){
         this.paths = {
                       '/index.js' : getCollectionModule('/asdf/index.js')
@@ -290,8 +261,8 @@ describe('SamFSRouteLoader', function(){
       var that = this;
       this.loader.load(function(err){
         should.not.exist(err);
-        that.router.getUrl('root').should.equal('/sub');
-        that.router.getUrl('/sub/*root', {root : 1234}).should.equal('/sub/1234');
+        that.router.getUrl('/sub').should.equal('/sub');
+        that.router.getUrl('/sub/:root', {root : 1234}).should.equal('/sub/1234');
         should.exist(that.router.getHandler('/sub'));
         should.exist(that.router.getHandler('/sub/1234/'));
         should.exist(that.router.getHandler('/sub/thisIsATest'));

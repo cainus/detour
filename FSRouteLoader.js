@@ -2,17 +2,16 @@ var fs = require('fs');
 var DirRequirer = require('./DirRequirer').DirRequirer;
 var DetourError = require('./DetourError').DetourError;
 var _ = require('underscore');
-var AutoNamer = require('./AutoNamer');
 var AutoPather = require('./AutoPather');
 
-var SamFSRouteLoader = function(router, dir){
+var FSRouteLoader = function(router, dir){
   this.router = router;  // requires a detour router for input;
   this.requirer = new DirRequirer(dir);
   this.dir = dir;
   this.paths = [];
 };
 
-SamFSRouteLoader.prototype.load = function(cb){
+FSRouteLoader.prototype.load = function(cb){
   var that = this;
   var requirer = this.requirer;
   requirer.require(function(err){
@@ -46,11 +45,11 @@ var routePath = function(that, path, originalPaths){
   if (obj.type === 'file'){
     var url = new AutoPather(that.paths).path(path);
     var nonMemberUrl = url.replace(/\/\*[^\/]+$/, '');  // strip any dynamic part off the end
-    var name = new AutoNamer(that.paths).name(path);
-    var nonMemberName = name.replace(/\*$/, ''); // strip any dynamic part off the end
-    that.router.route(nonMemberUrl,obj.module.handler).as(nonMemberName);
+    nonMemberUrl = nonMemberUrl.replace(/\*/g, ':');
+    that.router.route(nonMemberUrl,obj.module.handler);//.as(nonMemberName);
     if (!!obj.module.wildcard){
-      that.router.route(url, obj.module.wildcard).as(name);
+      url = url.replace(/\*/g, ':');
+      that.router.route(url, obj.module.wildcard);//.as(name);
     }
   } else {
     // it's a dir
@@ -63,7 +62,7 @@ var routePath = function(that, path, originalPaths){
   }
 };
 
-exports.SamFSRouteLoader = SamFSRouteLoader;
+exports.FSRouteLoader = FSRouteLoader;
 
 var arrayRemove = function(arr, val){
 

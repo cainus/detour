@@ -89,46 +89,13 @@ describe('Router', function(){
         resource.decorated = true;
         return resource;
       });
-      d.freeRoute('/asdf/:asdf_id', function($){ 
+      d.route('/asdf/:asdf_id', function($){ 
         $.res.end("hello world" + this.decorated);
         done();
       });
       var req = { url : "http://asdf.com/asdf/1234", method : "GET"};
       d.dispatch({ req : req, res : this.res});
       this.res.expectEnd("hello worldtrue");
-    });
-  });
-
-  describe('#name', function(){
-    it ("throws an exception if the path doesn't exist", function(){
-        var d = new Router();
-        expectException(function(){
-          d.name('/', 'root');
-        }, "PathDoesNotExist", 
-            "Cannot name a path that doesn't exist", 
-            {"path":"/", "name":"root"});
-    });
-    it ("throws an exception if name starts with '/'", function(){
-        var d = new Router();
-        expectException(function(){
-          d.name('/', '/root');
-        }, "InvalidName",
-            "Cannot name a path with a name that starts with '/'.",
-            {});
-    });
-    it ("allows a path to be set if it exists", function(){
-        var d = new Router();
-        d.route('/', function($){ $.res.send("hello world");});
-        d.name('/', 'root');
-    });
-  });
-
-  describe('#as', function(){
-    it ('names the given route', function(){
-        var d = new Router();
-        d.route('/', function($){ $.res.end("hello world");}).as("root");
-        var url = d.getUrl("root");
-        url.should.equal('/');
     });
   });
 
@@ -148,9 +115,9 @@ describe('Router', function(){
     it ('returns a hash of vars for a star route', function(){
       var d = new Router();
       d.route('/', function($){ $.res.send("hello world");});
-      d.route('/*onetwothreefour', function($){ $.res.send("hello world");});
-      d.route('/*onetwothreefour/asdf', function($){ $.res.send("hello world");});
-      d.route('/*onetwothreefour/asdf/*fourfivesixseven', function($){ $.res.send("hello world");});
+      d.route('/:onetwothreefour', function($){ $.res.send("hello world");});
+      d.route('/:onetwothreefour/asdf', function($){ $.res.send("hello world");});
+      d.route('/:onetwothreefour/asdf/:fourfivesixseven', function($){ $.res.send("hello world");});
       var vars = d.pathVariables('http://asdf.com/%201234%20/asdf/4567');
       _.keys(vars).length.should.equal(2);
       vars.onetwothreefour.should.equal(' 1234 ');
@@ -214,21 +181,21 @@ describe('Router', function(){
 
   });
 
-	describe('#freeRoute', function(){
+	describe('#route', function(){
 
     it ("can route a function as a GET", function(done){
         var d = new Router('/api');
-        d.freeRoute('/asdf/:asdf_id', function($){ 
+        d.route('/asdf/:asdf_id', function($){ 
           done();
         });
-        var req = { url : "http://asdf.com/asdf/1234", method : "GET"};
+        var req = { url : "http://asdf.com/api/asdf/1234", method : "GET"};
         d.dispatch({req : req, res : this.res});
     });
 
     it ("can route an object with a GET", function(){
         var d = new Router('/api');
-        d.freeRoute('/asdf/:asdf_id', { GET : function($){$.res.end("hello world");}});
-        var req = { url : "http://asdf.com/asdf/1234", method : "GET"};
+        d.route('/asdf/:asdf_id', { GET : function($){$.res.end("hello world");}});
+        var req = { url : "http://asdf.com/api/asdf/1234", method : "GET"};
         d.dispatch({req : req, res : this.res});
         this.res.expectEnd("hello world");
     });
@@ -237,7 +204,7 @@ describe('Router', function(){
         var d = new Router();
         expectException(
            function(){
-             d.freeRoute('/', {});
+             d.route('/', {});
            },
            "HandlerHasNoHttpMethods", 
            "The handler you're trying to route to should implement HTTP methods.",
@@ -262,19 +229,6 @@ describe('Router', function(){
         var req = { url : "http://asdf.com/api", method : "GET"};
         d.dispatch({req : req, res : this.res});
         this.res.expectEnd("hello world");
-    });
-
-    it ("throws an exception if you try to mount a url without a parent", function(){
-        var d = new Router();
-        var simpleModule = this.simpleModule;
-        expectException(
-           function(){
-             d.route('/asdf', simpleModule);
-           },
-           "ParentDoesNotExist", 
-           "The route you're trying to add does not have a parent route defined.", 
-           '/asdf'
-        );
     });
 
     it ("can add a route if the parent of the path exists", function(){
@@ -303,7 +257,7 @@ describe('Router', function(){
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule);
         d.route('/hello/', { GET : function($){$.res.send("hello world");}});
-        d.route('/hello/*somenum', { GET : function($){$.res.end("hello world 2");}});
+        d.route('/hello/:somenum', { GET : function($){$.res.end("hello world 2");}});
         var req = { url : "http://asdf.com/api/hello/1234", method : "GET"};
         d.dispatch({req : req, res : this.res});
         this.res.expectEnd("hello world 2");
@@ -330,13 +284,7 @@ describe('Router', function(){
           d.getUrl('/');
         }, 'NotFound', 'That route is unknown.', '/');
     });
-    it ("throws an error when the name doesn't exist", function(){
-        var d = new Router();
-        expectException(function(){
-          d.getUrl('some_name');
-        }, 'NotFound', 'That route name is unknown.', 'some_name');
-    });
-    it ("returns the url for static path as that static path", function(){
+    it ("returns the url for a literal path as that literal path", function(){
         var d = new Router();
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule);
@@ -357,9 +305,9 @@ describe('Router', function(){
         var d = new Router();
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule);
-        d.route('/*asdf', simpleModule);
+        d.route('/:asdf', simpleModule);
         expectException(function(){
-          var url = d.getUrl('/*asdf');
+          var url = d.getUrl('/:asdf');
         }, 'MissingVariable', 
             "One of the necessary variables was not provided.",
             "asdf");
@@ -368,30 +316,24 @@ describe('Router', function(){
         var d = new Router();
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule);
-        d.route('/*asdf', simpleModule);
-        var url = d.getUrl('/*asdf', {asdf : 1234});
+        d.route('/:asdf', simpleModule);
+        var url = d.getUrl('/:asdf', {asdf : 1234});
         url.should.equal('/1234');
     });
     it ("returns the url for a double star path with variables injected", function(){
         var d = new Router();
         var simpleModule = this.simpleModule;
         d.route('/', simpleModule);
-        d.route('/*asdf', simpleModule);
-        d.route('/*asdf/sub', simpleModule);
-        d.route('/*asdf/sub/*sub_id', simpleModule);
-        var url = d.getUrl('/*asdf/sub/*sub_id', {asdf : 1234, sub_id : 4567});
+        d.route('/:asdf', simpleModule);
+        d.route('/:asdf/sub', simpleModule);
+        d.route('/:asdf/sub/:sub_id', simpleModule);
+        var url = d.getUrl('/:asdf/sub/:sub_id', {asdf : 1234, sub_id : 4567});
         url.should.equal('/1234/sub/4567');
     });
-    it ("returns the url for a NAMED double star path with variables injected", function(){
-        var d = new Router();
-        var simpleModule = this.simpleModule;
-        d.route('/', simpleModule);
-        d.route('/*asdf', simpleModule);
-        d.route('/*asdf/sub', simpleModule);
-        d.route('/*asdf/sub/*sub_id', simpleModule);
-        d.name('/*asdf/sub/*sub_id', 'subby');
-        var url = d.getUrl('subby', {asdf : 1234, sub_id : 4567});
-        url.should.equal('/1234/sub/4567');
+    it ("returns the url for a double star path with variables injected #2", function(){
+       var d = new Router();
+       d.route('/:root/artist/:artist', this.simpleModule);
+       d.getUrl('/:root/artist/:artist', {root : 5678, artist : 1234}).should.equal('/5678/artist/1234');
     });
   });
 
@@ -599,184 +541,6 @@ describe('Router', function(){
   });
 
 
-
-	describe('#getChildUrls', function(){
-    it ("throws an exception when given url doesn't exist", function(){
-          var d = new Router();
-          expectException(function(){
-            d.getChildUrls('http://asdf.com');
-          }, 'NotFound', 'That route is unknown.', '/');
-
-    });
-    it ("gets child urls for a parent path correctly", function(){
-          var d = new Router();
-          d.route('/', { GET : function(context){
-                              context.res.end("GET output");
-                        }});
-          d.route('/asdf', { GET : function(context){
-                              context.res.end("GET output");
-                        }});
-          var urls = d.getChildUrls('http://asdf.com');
-          var keys = _.keys(urls);
-          keys.length.should.equal(1);
-          keys[0].should.equal('/asdf');
-          should.not.exist(urls['/asdf']);
-    });
-    it ("gets child urls for a parent path correctly when given just the path", function(){
-          var d = new Router();
-          d.route('/', { GET : function(context){
-                              context.res.end("GET output");
-                        }});
-          d.route('/asdf', { GET : function(context){
-                              context.res.end("GET output");
-                        }});
-          var urls = d.getChildUrls('/');
-          var keys = _.keys(urls);
-          keys.length.should.equal(1);
-          keys[0].should.equal('/asdf');
-          should.not.exist(urls['/asdf']);
-    });
-    it ("gets multiple child urls for a parent path", function(){
-          var d = new Router();
-          d.route('/', { GET : function(context){
-                              context.res.end("GET output");
-                        }});
-          d.route('/asdf', { GET : function(context){
-                              context.res.end("GET output");
-                        }});
-          d.route('/other', { GET : function(context){
-                              context.res.end("GET output");
-                        }});
-          var urls = d.getChildUrls('http://asdf.com');
-          var keys = _.keys(urls);
-          keys.length.should.equal(2);
-          keys[0].should.equal('/asdf');
-          keys[1].should.equal('/other');
-          should.not.exist(urls['/asdf']);
-          should.not.exist(urls['/other']);
-    });
-    it ("doesn't get grandkids", function(){
-          var d = new Router();
-          d.route('/', { GET : function(context){
-                              context.res.end("GET output");
-                        }});
-          d.route('/asdf', { GET : function(context){
-                              context.res.end("GET output");
-                        }});
-          d.route('/asdf/grankid', { GET : function(context){
-                              context.res.end("GET output");
-                        }});
-
-          var urls = d.getChildUrls('http://asdf.com');
-          var keys = _.keys(urls);
-          keys.length.should.equal(1);
-          keys[0].should.equal('/asdf');
-          should.not.exist(urls['/asdf']);
-    });
-    it ("doesn't get starRoutes", function(){
-          var d = new Router();
-          d.route('/', { GET : function(context){
-                              context.res.end("GET output");
-                        }});
-          d.route('/*asdf', { GET : function(context){
-                              context.res.end("GET output");
-                        }});
-          var urls = d.getChildUrls('http://asdf.com');
-          var keys = _.keys(urls);
-          keys.length.should.equal(0);
-    }); 
-
-    it ("can get children of starRoutes", function(){
-          var d = new Router();
-          d.route('/', { GET : function(context){
-                              context.res.end("GET output");
-                        }}).as('root');
-          d.route('/*asdf', { GET : function(context){
-                              context.res.end("GET output");
-                        }}).as('asdf*');
-          d.route('/*asdf/grandkid', { GET : function(context){
-                              context.res.end("GET output");
-                        }}).as('grandkid');
-          var urls = d.getChildUrls('http://asdf.com/1234');
-          var keys = _.keys(urls);
-          keys.length.should.equal(1);
-          keys[0].should.equal('/1234/grandkid');
-    });
-
-    it ("can get children of starRoutes when the root path is not /", function(){
-          var d = new Router('/somepath');
-          d.route('/', { GET : function(context){
-                              context.res.end("GET output");
-                        }}).as('root');
-          d.route('/*asdf', { GET : function(context){
-                              context.res.end("GET output");
-                        }}).as('asdf*');
-          d.route('/*asdf/grandkid', { GET : function(context){
-                              context.res.end("GET output");
-                        }}).as('grandkid');
-          var urls = d.getChildUrls('http://asdf.com/somepath/1234');
-          var keys = _.keys(urls);
-          keys.length.should.equal(1);
-          keys[0].should.equal('/somepath/1234/grandkid');
-    });
-
-    it ("populates the names of child routes where possible", function(){
-          var d = new Router();
-          d.route('/', { GET : function(context){
-                              context.res.end("GET output");
-                        }}).as('root');
-          d.route('/asdf', { GET : function(context){
-                              context.res.end("GET output");
-                        }}).as('asdf*');
-          d.route('/asdf/grandkid', { GET : function(context){
-                              context.res.end("GET output");
-                        }}).as('grandkid');
-          var urls = d.getChildUrls('http://asdf.com/asdf');
-          var keys = _.keys(urls);
-          keys.length.should.equal(1);
-          keys[0].should.equal('/asdf/grandkid');
-          urls['/asdf/grandkid'].should.equal('grandkid');
-    });
-
-    it ("populates the names of child routes of starRoutes where possible", function(){
-          var d = new Router();
-          d.route('/', { GET : function(context){
-                              context.res.end("GET output");
-                        }}).as('root');
-          d.route('/*asdf', { GET : function(context){
-                              context.res.end("GET output");
-                        }}).as('asdf*');
-          d.route('/*asdf/grandkid', { GET : function(context){
-                              context.res.end("GET output");
-                        }}).as('grandkid');
-          var urls = d.getChildUrls('http://asdf.com/1234');
-          var keys = _.keys(urls);
-          keys.length.should.equal(1);
-          keys[0].should.equal('/1234/grandkid');
-          urls['/1234/grandkid'].should.equal('grandkid');
-    });
-
-  });
-
-  describe('#getNamedChildUrls', function(){
-    var d = new Router();
-    d.route('/', { GET : function(context){
-                        context.res.end("GET output");
-                  }}).as('root');
-    d.route('/asdf', { GET : function(context){
-                        context.res.end("GET output");
-                  }}).as('asdf');
-    d.route('/qwerty', { GET : function(context){
-                        context.res.end("GET output");
-                  }});  // this one is not named
-    var urls = d.getNamedChildUrls('http://asdf.com/');
-    var keys = _.keys(urls);
-    keys.length.should.equal(1);
-    keys[0].should.equal('asdf');
-    urls.asdf.should.equal('/asdf');
-  });
-
-
 	describe('#getParentUrl', function(){
     it ("throws an exception when getting the parent url of a root node", function(){
           var d = new Router();
@@ -787,7 +551,7 @@ describe('Router', function(){
               d.getParentUrl('http://asdf.com');
           }, 'NoParentUrl', 'The given path has no parent path', '/');
     });
-    it ("returns the parent url for a child path correctly", function(){
+    it ("returns the parent url for a simple child path correctly", function(){
           var d = new Router();
           d.route('/', { GET : function(context){
                               context.res.end("GET output");

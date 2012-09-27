@@ -1,4 +1,5 @@
 var url = require('url');
+var DetourError = require('./DetourError').DetourError;
 
 var FreeRouteCollection = function(){
   this.routes = [];
@@ -19,7 +20,7 @@ FreeRouteCollection.prototype.set = function(path, handler, sensitive, strict){
 // star route.
 FreeRouteCollection.prototype.get = function(inUrl){
   if (inUrl.length > 4096){
-    throw 'URI Too Long';
+    throw "URI Too Long";
   }
   var path = getPath(inUrl);
 
@@ -30,7 +31,6 @@ FreeRouteCollection.prototype.get = function(inUrl){
       return route;
     }
   }
-
   throw "Not Found";
 };
 
