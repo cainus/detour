@@ -1,5 +1,5 @@
 require('should');
-var AutoPather = require('../AutoPather');
+var AutoPather = require('../index').AutoPather;
 // simple in these tests means "non-collection".
 
 

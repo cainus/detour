@@ -1,8 +1,8 @@
 var should = require('should');
 var hottap = require('hottap').hottap;
 var _ = require('underscore');
-var Router = require('../Router').Router;
-var FSRouteLoader = require('../FSRouteLoader').FSRouteLoader;
+var Router = require('../index').Router;
+var FSRouteLoader = require('../index').FSRouteLoader;
 
 var getSimpleModule = function(fullpath){
   return { module : { handler : {GET : function(req, res){res.end(fullpath);} } },

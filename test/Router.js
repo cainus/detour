@@ -1,7 +1,7 @@
 var should = require('should');
 var hottap = require('hottap').hottap;
 var _ = require('underscore');
-var Router = require('../Router').Router;
+var Router = require('../index').Router;
 
 describe('Router', function(){
 
@@ -162,7 +162,7 @@ describe('Router', function(){
 	describe('#staticRoute', function(){
     it ("errors if the dir doesn't exist", function(done){
         var d = new Router('/api');
-        var dir = __dirname + '/sam_test_fixtures/NO_EXIST/';
+        var dir = __dirname + '/test_fixtures/NO_EXIST/';
         d.staticRoute(dir, function(err){
           err.should.equal("static directory does not exist: ");
           done();
@@ -170,7 +170,7 @@ describe('Router', function(){
     });
     it ("sets the staticDir property", function(done){
         var d = new Router('/api');
-        var dir = __dirname + '/sam_test_fixtures/static/';
+        var dir = __dirname + '/test_fixtures/static/';
         d.staticRoute(dir, function(err){
           should.not.exist(err);
           d.staticDir.should.equal(dir);
