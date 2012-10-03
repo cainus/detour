@@ -68,12 +68,12 @@ describe('Router', function(){
 
   describe('#onRequest', function(){
     it ("can be overridden to decorate the context object", function(){
-        var d = new Router('/api');
+        var d = new Router();
         d.onRequest = function(resource, context, cb){
           context.url = context.req.url;
           cb(null, context);
         };
-        d.route('/', {GET : function($){$.res.end("hello world: " + $.url);}});
+        d.route('/api', {GET : function($){$.res.end("hello world: " + $.url);}});
         var req = { url : "http://asdf.com/api", method : "GET"};
         d.dispatch({ req : req, res : this.res});
         this.res.expectEnd("hello world: http://asdf.com/api");
@@ -161,7 +161,7 @@ describe('Router', function(){
 
 	describe('#staticRoute', function(){
     it ("errors if the dir doesn't exist", function(done){
-        var d = new Router('/api');
+        var d = new Router();
         var dir = __dirname + '/test_fixtures/NO_EXIST/';
         d.staticRoute(dir, function(err){
           err.should.equal("static directory does not exist: ");
@@ -169,7 +169,7 @@ describe('Router', function(){
         });
     });
     it ("sets the staticDir property", function(done){
-        var d = new Router('/api');
+        var d = new Router();
         var dir = __dirname + '/test_fixtures/static/';
         d.staticRoute(dir, function(err){
           should.not.exist(err);
@@ -181,11 +181,39 @@ describe('Router', function(){
 
   });
 
+  describe('#routeDirectory', function(){
+    it ("can route a directory to a path", function(done){
+      var d = new Router();
+      var dir = __dirname + '/test_fixtures/resources/';
+      var path = "/somepath";
+      var res = this.res;
+      d.routeDirectory(dir, path, function(err){
+        should.not.exist(err);
+        var req = { url : "http://asdf.com/somepath", method : "GET"};
+        d.dispatch({req : req, res : res});
+        res.expectEnd('{"member" : "http://localhost:9999/1234/"}');
+        done();
+      });
+    });
+
+    it ("returns an error if the directory doesn't exist", function(done){
+      var d = new Router();
+      var dir = __dirname + '/test_fixtures/NON_EXISTENT/';
+      var path = "/";
+      d.routeDirectory(dir, path, function(err){
+        err.message.should.equal("The given directory does not exist.");
+        err.name.should.equal("InvalidDirectory");
+        err.detail.should.equal(dir);
+        done();
+      });
+    });
+  });
+
 	describe('#route', function(){
 
     it ("can route a function as a GET", function(done){
-        var d = new Router('/api');
-        d.route('/asdf/:asdf_id', function($){ 
+        var d = new Router();
+        d.route('/api/asdf/:asdf_id', function($){ 
           done();
         });
         var req = { url : "http://asdf.com/api/asdf/1234", method : "GET"};
@@ -193,71 +221,41 @@ describe('Router', function(){
     });
 
     it ("can route an object with a GET", function(){
-        var d = new Router('/api');
-        d.route('/asdf/:asdf_id', { GET : function($){$.res.end("hello world");}});
+        var d = new Router();
+        d.route('/api/asdf/:asdf_id', { GET : function($){$.res.end("hello world");}});
         var req = { url : "http://asdf.com/api/asdf/1234", method : "GET"};
         d.dispatch({req : req, res : this.res});
         this.res.expectEnd("hello world");
     });
 
-    it ("throws an exception if the module doesn't implement any methods", function(){
-        var d = new Router();
-        expectException(
-           function(){
-             d.route('/', {});
-           },
-           "HandlerHasNoHttpMethods", 
-           "The handler you're trying to route to should implement HTTP methods.",
-           {}
-        );
-    });
-
-  });
-	describe('#route', function(){
-
-    it ("can route a function as a GET", function(){
-        var d = new Router('/api');
-        d.route('/', function($){$.res.end("hello world");});
-        var req = { url : "http://asdf.com/api", method : "GET"};
-        d.dispatch({req : req, res : this.res});
-        this.res.expectEnd("hello world");
-    });
-
-    it ("can route an object with a GET", function(){
-        var d = new Router('/api');
-        d.route('/', { GET : function($){$.res.end("hello world");}});
-        var req = { url : "http://asdf.com/api", method : "GET"};
-        d.dispatch({req : req, res : this.res});
-        this.res.expectEnd("hello world");
-    });
 
     it ("can add a route if the parent of the path exists", function(){
-        var d = new Router('/api');
+        var d = new Router();
         var simpleModule = this.simpleModule;
-        d.route('/', simpleModule);
-        d.route('/hello', { GET : function($){$.res.end("hello world");}});
+        d.route('/api/', simpleModule);
+        d.route('/api/hello', { GET : function($){$.res.end("hello world");}});
         var req = { url : "http://asdf.com/api/hello", method : "GET"};
         d.dispatch({req : req, res : this.res});
         this.res.expectEnd("hello world");
     });
 
     it ("can add a route to a non-root path that exists", function(){
-        var d = new Router('/api');
+        var d = new Router();
         var simpleModule = this.simpleModule;
-        d.route('/', simpleModule);
-        d.route('/hello/', { GET : function($){$.res.send("hello world");}});
-        d.route('/hello/somenum', { GET : function($){$.res.end("hello world 2");}});
+        d.route('/api/', simpleModule);
+        d.route('/api/hello/', { GET : function($){$.res.send("hello world");}});
+        d.route('/api/hello/somenum', { GET : function($){$.res.end("hello world 2");}});
         var req = { url : "http://asdf.com/api/hello/somenum", method : "GET"};
         d.dispatch({ req : req, res : this.res});
         this.res.expectEnd("hello world 2");
     });
 
     it ("can add a wildcard route", function(){
-        var d = new Router('/api');
+        var d = new Router();
         var simpleModule = this.simpleModule;
-        d.route('/', simpleModule);
-        d.route('/hello/', { GET : function($){$.res.send("hello world");}});
-        d.route('/hello/:somenum', { GET : function($){$.res.end("hello world 2");}});
+        d.route('/api/', simpleModule);
+        d.route('/api/hello/', { GET : function($){$.res.send("hello world");}});
+        d.route('/api/hello/:somenum', { GET : function($){$.res.end("hello world 2");}});
         var req = { url : "http://asdf.com/api/hello/1234", method : "GET"};
         d.dispatch({req : req, res : this.res});
         this.res.expectEnd("hello world 2");
@@ -539,7 +537,6 @@ describe('Router', function(){
     });
 
   });
-
 
 	describe('#getParentUrl', function(){
     it ("throws an exception when getting the parent url of a root node", function(){

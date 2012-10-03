@@ -1,8 +1,6 @@
 exports.handler = {
 
   GET : function($){
-    console.log($.req.url);
-    console.log("collection");
     $.res.end('{"member" : "http://localhost:9999/1234/"}');
   }
 

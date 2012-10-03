@@ -200,9 +200,9 @@ describe('FSRouteLoader', function(){
     });
 
     it ("can nest collection modules", function(done){
-      this.router = new Router("/sub");  // set the router's path.  this is key.
+      this.router = new Router();
       this.dir = __dirname + '/test_fixtures/resources';
-      this.loader = new FSRouteLoader(this.router, this.dir);
+      this.loader = new FSRouteLoader(this.router, this.dir, "/sub");
 
       this.loader.requirer.require = function(cb){
         this.paths = {
@@ -249,9 +249,9 @@ describe('FSRouteLoader', function(){
     });
 
     it ("can route a root collection when the router's path is set", function(done){
-      this.router = new Router("/sub");  // set the router's path.  this is key.
+      this.router = new Router(); 
       this.dir = __dirname + '/test_fixtures/resources';
-      this.loader = new FSRouteLoader(this.router, this.dir);
+      this.loader = new FSRouteLoader(this.router, this.dir, "/sub");
       this.loader.requirer.require = function(cb){
         this.paths = {
                       '/index.js' : getCollectionModule('/asdf/index.js')
