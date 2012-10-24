@@ -220,7 +220,7 @@ describe('Router', function(){
         d.dispatch({req : req, res : this.res});
     });
 
-    it ("can route an object with a GET", function(){
+    it ("can route an object with a GET with 1 param (context)", function(){
         var d = new Router();
         d.route('/api/asdf/:asdf_id', { GET : function($){$.res.end("hello world");}});
         var req = { url : "http://asdf.com/api/asdf/1234", method : "GET"};
@@ -228,6 +228,32 @@ describe('Router', function(){
         this.res.expectEnd("hello world");
     });
 
+    it ("can route an object with a GET with 2 params (req, res)", function(){
+        var d = new Router();
+        d.route('/api/asdf/:asdf_id', {
+                                          GET : function(req, res){
+                                            req.url.should.equal('http://asdf.com/api/asdf/1234');
+                                            res.end("hello world");
+                                          }
+                                      });
+        var req = { url : "http://asdf.com/api/asdf/1234", method : "GET"};
+        d.dispatch({req : req, res : this.res});
+        this.res.expectEnd("hello world");
+    });
+
+    it ("can route an object with a GET with 3 params (req, res, context)", function(){
+        var d = new Router();
+        d.route('/api/asdf/:asdf_id', {
+                                          GET : function(req, res, context){
+                                            context.req.should.equal(req);
+                                            req.url.should.equal('http://asdf.com/api/asdf/1234');
+                                            res.end("hello world");
+                                          }
+                                      });
+        var req = { url : "http://asdf.com/api/asdf/1234", method : "GET"};
+        d.dispatch({req : req, res : this.res});
+        this.res.expectEnd("hello world");
+    });
 
     it ("can add a route if the parent of the path exists", function(){
         var d = new Router();
