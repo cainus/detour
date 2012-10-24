@@ -337,7 +337,7 @@ describe('Router', function(){
 
   describe('#dispatch', function(){
 
-    context("there's no matching route", function(){
+    describe("there's no matching route", function(){
       beforeEach(function(){
         this.d = new Router();
         this.req = {url : "http://asdf.com/", method : 'GET'};
@@ -355,7 +355,7 @@ describe('Router', function(){
       });
     });
 
-    context("the url is too long", function(){
+    describe("the url is too long", function(){
       beforeEach(function(){
         this.d = new Router();
         var simpleModule = this.simpleModule;
@@ -376,7 +376,7 @@ describe('Router', function(){
 
     });
 
-    context("the resource doesn't support the http method", function(){
+    describe("the resource doesn't support the http method", function(){
       beforeEach(function(){
         this.d = new Router();
         var simpleModule = this.simpleModule;
@@ -396,7 +396,7 @@ describe('Router', function(){
       });
 
     });
-    context("an exception is thrown", function(){
+    describe("an exception is thrown", function(){
       beforeEach(function(){
         this.d = new Router();
         var simpleModule = this.simpleModule;
@@ -419,7 +419,7 @@ describe('Router', function(){
       });
     });
 
-    context("the server doesn't support the http method", function(){
+    describe("the server doesn't support the http method", function(){
       beforeEach(function(){
         this.d = new Router();
         var simpleModule = this.simpleModule;
@@ -477,7 +477,7 @@ describe('Router', function(){
             d.handle500 = function(context, ex){
               console.log(ex);
             };
-            context = { req : req, res : this.res };
+            var context = { req : req, res : this.res };
             d.dispatch(context);
           } catch (ex){
             console.log(ex);
@@ -494,7 +494,7 @@ describe('Router', function(){
           d.dispatch({ req : req, res : this.res });
           this.res.expectStatus(404);
       });
-      context("when the resource exists", function(){
+      describe("when the resource exists", function(){
         beforeEach(function(){
           this.d = new Router();
           this.d.route('/', { GET : function(context){
