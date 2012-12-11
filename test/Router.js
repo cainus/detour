@@ -610,6 +610,20 @@ describe('Router', function(){
           var url = d.getParentUrl('http://asdf.com/asdf/grandkid');
           url.should.equal('/asdf');
     });
+    it ("returns the parent url for a grandchild path (with trailing slash) correctly", function(){
+          var d = new Router();
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
+                        }});
+          d.route('/asdf', { GET : function(context){
+                              context.res.end("GET output");
+                        }});
+          d.route('/asdf/grandkid', { GET : function(context){
+                              context.res.end("GET output");
+                        }});
+          var url = d.getParentUrl('http://asdf.com/asdf/grandkid/');
+          url.should.equal('/asdf');
+    });
 
   });
 
