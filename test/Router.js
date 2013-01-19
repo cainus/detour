@@ -596,7 +596,7 @@ describe('Router', function(){
           var url = d.getParentUrl('/asdf');
           url.should.equal('/');
     });
-    it ("returns the parent url for a grandchild path correctly", function(){
+    it ("returns the parent url for a grandchild path", function(){
           var d = new Router();
           d.route('/', { GET : function(context){
                               context.res.end("GET output");
@@ -610,7 +610,7 @@ describe('Router', function(){
           var url = d.getParentUrl('http://asdf.com/asdf/grandkid');
           url.should.equal('/asdf');
     });
-    it ("returns the parent url for a grandchild path (with trailing slash) correctly", function(){
+    it ("returns the parent url for a grandchild path (with trailing slash)", function(){
           var d = new Router();
           d.route('/', { GET : function(context){
                               context.res.end("GET output");
@@ -622,6 +622,20 @@ describe('Router', function(){
                               context.res.end("GET output");
                         }});
           var url = d.getParentUrl('http://asdf.com/asdf/grandkid/');
+          url.should.equal('/asdf');
+    });
+    it ("returns the parent url for a path with trailing slash and querystring", function(){
+          var d = new Router();
+          d.route('/', { GET : function(context){
+                              context.res.end("GET output");
+                        }});
+          d.route('/asdf', { GET : function(context){
+                              context.res.end("GET output");
+                        }});
+          d.route('/asdf/grandkid', { GET : function(context){
+                              context.res.end("GET output");
+                        }});
+          var url = d.getParentUrl('http://asdf.com/asdf/grandkid/?asdf=234');
           url.should.equal('/asdf');
     });
 
