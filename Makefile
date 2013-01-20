@@ -1,6 +1,6 @@
 REPORTER = dot
 test:
-	@NODE_ENV=test ./node_modules/.bin/mocha -b --reporter $(REPORTER)
+	@NODE_ENV=test ./node_modules/.bin/mocha -b --reporter $(REPORTER)  && node domaintest.js
 
 lib-cov:
 	jscoverage lib lib-cov
