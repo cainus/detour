@@ -19,7 +19,7 @@
       "dependencies": {
           "underscore" : "",
           "walk" : "2.1.1",
-          "connect" : "2.4.3"
+          "send": "0.0.3"
       },
       "devDependencies" : {
           "watch" : "0.5.1", 
