@@ -1,33 +1,41 @@
 {
-      "name": "detour",
-      "description" : "detour is a reimagining of routing in node.js",
-      "keywords" : ["api", "rest", "http", "resource", "routing", "router", "route"], 
-      "version": "0.16.7",
-      "bugs": {
-       "url": "https://github.com/cainus/detour/issues"
-      },
-      "scripts" : {
-        "test" : "make test"
-      },
-      "maintainers": [
-        {
-          "name": "Gregg Caines",
-          "email": "gregg@caines.ca",
-          "web": "http://caines.ca"
-        } 
-      ],
-      "dependencies": {
-          "underscore" : "",
-          "walk" : "2.1.1",
-          "send": "0.1.4"
-      },
-      "devDependencies" : {
-          "watch" : "0.5.1", 
-          "hottap" : "1.0.0",
-          "mocha" : "1.3.2",
-          "should" : "1.1.0"
-      },
-      "repository" : "git@github.com:cainus/detour.git",
-      "main" : "./detour",
-      "license": "MIT"
+  "name": "detour",
+  "version": "1.0.0",
+  "description": "Resource-oriented routing:  Route to objects instead of functions for better code-reuse and organization.",
+  "main": "index.js",
+  "scripts": {
+    "test": "make test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/cainus/detour.git"
+  },
+  "keywords": [
+    "router",
+    "resourceful",
+    "resource",
+    "rest",
+    "route",
+    "middleware",
+    "http",
+    "api"
+  ],
+  "author": "Gregg Caines",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cainus/detour/issues"
+  },
+  "homepage": "https://github.com/cainus/detour",
+  "devDependencies": {
+    "istanbul": "~0.2.3",
+    "mocha": "~1.16.2",
+    "should": "~2.1.1",
+    "verity": "0.0.6",
+    "jshint": "~2.4.0"
+  },
+  "dependencies": {
+    "connect": "~2.12.0",
+    "debug": "~0.7.4",
+    "methods": "~0.1.0"
+  }
 }

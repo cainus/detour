@@ -1,12 +1,23 @@
-REPORTER = dot
+REPORTER = spec
+
+lint:
+	./node_modules/.bin/jshint ./test ./index.js
+
 test:
-	@NODE_ENV=test ./node_modules/.bin/mocha -b --reporter $(REPORTER)  && node domaintest.js
+	$(MAKE) lint
+	./node_modules/.bin/mocha -b --reporter $(REPORTER) --check-leaks
 
-lib-cov:
-	jscoverage lib lib-cov
+test-cov:
+	$(MAKE) lint
+	./node_modules/.bin/istanbul cover \
+	./node_modules/mocha/bin/_mocha -- -b --reporter $(REPORTER) --check-leaks
+	echo "See reports at ./coverage/lcov-report/index.html"
 
-test-cov:  lib-cov
-	@COVERAGE=1 $(MAKE) test REPORTER=html-cov > coverage.html
-	rm -rf lib-cov
+test-coveralls:
+	echo TRAVIS_JOB_ID $(TRAVIS_JOB_ID)
+	./node_modules/.bin/istanbul cover \
+	./node_modules/mocha/bin/_mocha --report lcovonly \
+ 	-- -b --reporter $(REPORTER) --check-leaks && \
+		cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js
 
-.PHONY: test 
+.PHONY: test
