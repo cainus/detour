@@ -5,7 +5,7 @@
 var Route = require('./route');
 var methods = require('methods');
 var debug = require('debug')('router');
-var parse = require('connect').utils.parseUrl;
+var urlgrey = require('urlgrey');
 
 /**
  * Expose `Router` constructor.
@@ -38,7 +38,7 @@ function Router(options) {
       res.end('Not found');
     },
     405 : function(req, res, resource){
-      res.setHeader('Allow', allowHeader(resource));
+      res.setHeader('Allow', allowHeader(self, resource));
       res.writeHead(405);
       res.end('Not allowed');
     },
@@ -64,7 +64,7 @@ function Router(options) {
       return resource.GET(req, res);
     },
     'OPTIONS' : function(req, res, resource){
-      var header = allowHeader(resource);
+      var header = allowHeader(self, resource);
       res.setHeader('Allow', header);
       res.writeHead(200);
       res.end('Allow: ' + header);
@@ -76,10 +76,8 @@ function Router(options) {
 }
 
 
-Router.prototype.getRoute = function(req){
-  var method = req.method.toLowerCase();
-  var url = parse(req);
-  var path = url.pathname;
+Router.prototype.getRoute = function(url){
+  var path = urlgrey(url).path();
   var routes = this.routes;
   var route;
 
@@ -87,7 +85,6 @@ Router.prototype.getRoute = function(req){
   for (var i = 0; i < routes.length; ++i) {
     route = routes[i];
     if (route.match(path)) {
-      req._route_index = i;
       return route;
     }
   }
@@ -121,13 +118,7 @@ Router.prototype.on = function(event, handler){
   this.eventHandlers[event] = handler;
 };
 
-
-var allowHeader = function(resource){
-  var allowedMethods = getMethods(resource);
-  return allowedMethods.join(",");
-};
-
-var getMethods = function(resource){
+Router.prototype.getMethods = function(resource){
   var supportedMethods = [];
   for (var method in resource){
     if (methods.indexOf(method.toLowerCase()) !== -1){
@@ -143,12 +134,18 @@ var getMethods = function(resource){
   return supportedMethods;
 };
 
+var allowHeader = function(router, resource){
+  var allowedMethods = router.getMethods(resource);
+  return allowedMethods.join(",");
+};
+
+
 var dispatch = function(router, req, res, next){
   var route;
 
   debug('dispatching %s %s', req.method, req.url);
 
-  req.route = route = router.getRoute(req);
+  req.route = route = router.getRoute(req.url);
   if (!route){
     if (next){
       return next();
