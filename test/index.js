@@ -143,10 +143,9 @@ describe("detour", function(){
     it ("uses middleware's next() param for 404s, if defined", function(done){
       var getServer = function(router, cb){
         var server = http.createServer(function(req, res){
-          var next = function(req, res){
+          router.middleware(req, res, function(){
             res.end("next works!");
-          };
-          router.middleware(req, res, next);
+          });
         }).listen(9999, function(err){
             if (err) throw err;
             cb(null, server);

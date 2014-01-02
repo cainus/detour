@@ -30,10 +30,7 @@ function Router(options) {
   this.caseSensitive = options.caseSensitive;
   this.strict = options.strict;
   this.middleware = function (req, res, next){
-    if (next){
-      self.eventHandlers[404] = next;
-    }
-    dispatch(self, req, res);
+    dispatch(self, req, res, next);
   };
   this.eventHandlers = {
     404 : function(req, res){
@@ -146,13 +143,16 @@ var getMethods = function(resource){
   return supportedMethods;
 };
 
-var dispatch = function(router, req, res){
+var dispatch = function(router, req, res, next){
   var route;
 
   debug('dispatching %s %s', req.method, req.url);
 
   req.route = route = router.getRoute(req);
   if (!route){
+    if (next){
+      return next();
+    }
     return router.eventHandlers[404](req, res);
   }
   req.pathVar = {};
