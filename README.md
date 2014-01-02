@@ -1,7 +1,7 @@
 # detour
 [![Build Status](https://secure.travis-ci.org/cainus/detour.png?branch=master)](http://travis-ci.org/cainus/detour)
 [![Coverage Status](https://coveralls.io/repos/cainus/detour/badge.png?branch=master)](https://coveralls.io/r/cainus/detour?branch=master)
-[![NPM version](https://badge.fury.io/js/percolator.png)](http://badge.fury.io/js/percolator)
+[![NPM version](https://badge.fury.io/js/detour.png)](http://badge.fury.io/js/detour)
 
 Detour is a router for node.js web applications.
 
