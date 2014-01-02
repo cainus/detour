@@ -21,15 +21,19 @@ exports = module.exports = Router;
  */
 
 function Router(options) {
+  if ( !(this instanceof Router) ) {
+    return new Router(options);
+  }
   options = options || {};
   var self = this;
   this.routes = [];
-  this.params = {};
-  this._params = [];
   this.caseSensitive = options.caseSensitive;
   this.strict = options.strict;
   this.middleware = function (req, res, next){
-    dispatch(self, req, res, next);
+    if (next){
+      self.eventHandlers[404] = next;
+    }
+    dispatch(self, req, res);
   };
   this.eventHandlers = {
     404 : function(req, res){
@@ -142,8 +146,7 @@ var getMethods = function(resource){
   return supportedMethods;
 };
 
-var dispatch = function(router, req, res, next){
-  var params = router.params;
+var dispatch = function(router, req, res){
   var route;
 
   debug('dispatching %s %s', req.method, req.url);
@@ -152,9 +155,9 @@ var dispatch = function(router, req, res, next){
   if (!route){
     return router.eventHandlers[404](req, res);
   }
-  req.pathVars = {};
+  req.pathVar = {};
   for (var pvar in route.params){
-    req.pathVars[pvar] = route.params[pvar];
+    req.pathVar[pvar] = route.params[pvar];
   }
   var resource = route.resource;
   var resourceMethod = req.method.toUpperCase();

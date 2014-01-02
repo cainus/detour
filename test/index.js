@@ -41,7 +41,43 @@ describe("detour", function(){
     });
     getServer(router, function(err, serv){
       server = serv;
-      v.test(done);      
+      v.test(done);
+    });
+  });
+  it ("can be created without `new`", function(done){
+    var router = Router();
+    router.route('/', { 
+      GET : function(req, res){ 
+        res.end('worked'); 
+      }
+    });
+    getServer(router, function(err, serv){
+      server = serv;
+      v.test(done);
+    });
+  });
+  it ("can route multiple times", function(done){
+    var router = new Router();
+    router.route('/', { 
+      GET : function(req, res){ 
+        res.end('failed'); 
+      }
+    });
+    router.route('/test', { 
+      GET : function(req, res){ 
+        res.end('worked'); 
+      }
+    });
+    router.route('/test/:id', {
+      GET : function(req, res){
+        res.end('failed');
+      }
+    });
+    router.routes.length.should.equal(3);
+    getServer(router, function(err, serv){
+      server = serv;
+      v.uri = v.uri.path("test");
+      v.test(done);
     });
   });
   it ("200s for plain POST", function(done){
@@ -57,13 +93,13 @@ describe("detour", function(){
       v.test(done);      
     });
   });
-  describe("pathVars", function(){
-    it ("sets pathVars with variables from the url", function(done){
+  describe("pathVar", function(){
+    it ("sets pathVar with variables from the url", function(done){
       var router = new Router();
       router.route('/test/:testid', { 
         GET : function(req, res){ 
-          req.pathVars.testid.should.equal('1234');
-          res.end('worked: ' + JSON.stringify(req.pathVars)); 
+          req.pathVar.testid.should.equal('1234');
+          res.end('worked: ' + JSON.stringify(req.pathVar)); 
         }
       });
       getServer(router, function(err, serv){
@@ -101,6 +137,32 @@ describe("detour", function(){
         v.uri = v.uri.child("doesNotExist");
         v.expectedStatus = 400;
         v.expectedBody = 'bad request';
+        v.test(done);
+      });
+    });
+    it ("uses middleware's next() param for 404s, if defined", function(done){
+      var getServer = function(router, cb){
+        var server = http.createServer(function(req, res){
+          var next = function(req, res){
+            res.end("next works!");
+          };
+          router.middleware(req, res, next);
+        }).listen(9999, function(err){
+            if (err) throw err;
+            cb(null, server);
+          });
+      };
+      var router = new Router();
+      router.on(404, function(req, res){
+        res.writeHead(400);
+        res.write("bad request");
+        res.end();
+      });
+      getServer(router, function(err, serv){
+        server = serv;
+        v.uri = v.uri.child("doesNotExist");
+        v.expectedStatus = 200;
+        v.expectedBody = 'next works!';
         v.test(done);
       });
     });
