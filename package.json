@@ -18,7 +18,7 @@
       ],
       "dependencies": {
           "underscore" : "",
-          "walk" : "2.1.1",
+          "walk" : "git+ssh://git@github.com/cainus/node-walk.git#9e461cd9a52daa54b86cda2f2e17e55b6750553f",
           "send": "0.1.4"
       },
       "devDependencies" : {
