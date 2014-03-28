@@ -18,7 +18,9 @@ It works for node.js' standard HTTP server, as well as [express](http://expressj
 
 ```javascript
   var detour = require('detour');
+  var http   = require('http');
   var router = detour();
+
   router.route('/', {
     GET : function(req, res){
       res.end("GET works!");
@@ -27,11 +29,10 @@ It works for node.js' standard HTTP server, as well as [express](http://expressj
       res.end("POST works too!");
     }
   });
+
   http.createServer(function(req, res){
     router.middleware(req, res);
   }).listen(9999);
-  
-
 ```
 
 ### Using it in an express app:
