@@ -111,6 +111,31 @@ describe("detour", function(){
         v.test(done);      
       });
     });
+  it ("in middleware a next callback is passed to a route", function(done){
+	  var getServer = function(router, cb){
+		  server = http.createServer(function(req, res){
+			  router.middleware(req, res, function(err){
+				  res.end(err.message);
+			  });
+		  }).listen(9999, function(err){
+			  if (err) throw err;
+			  cb(null, server);
+		  });
+	  };
+	  var router = new Router();
+	  router.route('/test', {
+		  GET: function(req, res, next){
+			  next({
+				  message: 'next works!'
+			  })
+		  }
+	  });
+	  getServer(router, function(err, server){
+		  v = verity('http://localhost:9999/test', 'GET');
+		  v.expectedBody = 'next works!';
+		  v.test(done);
+	  });
+  });
     describe("pathVar", function(){
       it ("sets pathVar with variables from the url", function(done){
         var router = new Router();
@@ -124,7 +149,7 @@ describe("detour", function(){
           server = serv;
           v.uri = v.uri.path("test/1234");
           v.expectedBody = 'worked: {"testid":"1234"}';
-          v.test(done);      
+          v.test(done);
         });
       });
     });
