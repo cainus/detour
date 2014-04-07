@@ -167,7 +167,7 @@ var dispatch = function(router, req, res, next){
     }
     return router.eventHandlers[405](req, res, resource);
   }
-  resource[resourceMethod](req, res);
+  resource[resourceMethod](req, res, next);
 
 };
 
