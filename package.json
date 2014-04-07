@@ -1,6 +1,6 @@
 {
   "name": "detour",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Resource-oriented routing:  Route to objects instead of functions for better code-reuse and organization.",
   "main": "index.js",
   "scripts": {
