@@ -74,11 +74,72 @@ In the example above, you can see that the path string sent to the router (`/tes
 
 You can also see from the example  that within a route handler, `req.pathVar` will have all the variables collected from your route.
 
+### connect-style middleware
+Detour supports connect-style middleware like most node.js
+frameworks (including [express](http://expressjs.com)).  Example:
+```javascript
+  var detour = require('detour');
+  var router = detour();
+  router.use(someMiddleware);
+```
+
+The middleware stack for detour runs after the route has been
+determined, but before any other processing.  The entire routed resource
+object will be available at `req.detourHandler` if you want to do any
+special handling in your middleware that are related to its contents.
+
+This makes Detour extremely extensible on a resource-by-resource basis.  For example, if you write a resource object like this:
+
+```javascript
+  router.route('/test/:test_id', {
+    mustBeAuthenticated : true,   // <-- NB: non-standard property
+    GET : function(req, res){
+      res.end("GET works: " + req.pathVar.test_id);
+    },
+  });
+
+```
+
+...you can write a middleware that acts according to that data before the handler
+for GET is called.
+
+
+### collections
+In addition to regular object routing, For the sake of convenience, Detour also supports collection-routing where two resource objects can be routed in a
+collection-member relationship at the same time.
+
+Here's an example:
+
+```javascript
+var router = new Router();
+router.collection('/test/:testid', {
+  collection : {
+    GET : function(req, res){
+      res.end('collection here!');
+    }
+  },
+  member : {
+    GET : function(req, res){
+      res.end('member here! ' + JSON.stringify(req.pathVar));
+    }
+  }
+});
+```
+
+Note: the object being routed has two properties: `collection` and
+`member`, with each being a resource object on its own.  The `member`
+resource object will be routed to the given path (`/test/:testid` in this
+case), and the `collection` resource object will be routed to the parent
+path (`/test` in this case).
+
+This feature can be useful if you have resources that follow this
+pattern and you want to keep these two similar resources together in the same file.
+
 
 ### Method defaults and overrides:
 
 #### OPTIONS handling:
-There is a default OPTIONS response for any route but you can over-ride it like this: 
+There is a default OPTIONS response for any route but you can over-ride it like this:
 ```javascript
 router.on('OPTIONS', function(req, res, resource){
   // resource is the object you routed.  You can loop through the methods on it here if you want!
