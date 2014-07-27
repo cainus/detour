@@ -69,7 +69,6 @@ function Router(options) {
       res.writeHead(200);
       res.end('Allow: ' + header);
     }
-  
   };
   // we never tackle 501, because the node server just drops requests
   // with invalid methods
