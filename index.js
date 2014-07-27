@@ -4,8 +4,8 @@
 
 var Route = require('./route');
 var methods = require('methods');
-var debug = require('debug')('router');
 var urlgrey = require('urlgrey');
+var connect = require('connect');
 
 /**
  * Expose `Router` constructor.
@@ -29,6 +29,7 @@ function Router(options) {
   this.routes = [];
   this.caseSensitive = options.caseSensitive;
   this.strict = options.strict;
+  this.connect = connect();
   this.middleware = function (req, res, next){
     dispatch(self, req, res, next);
   };
@@ -74,6 +75,9 @@ function Router(options) {
   // with invalid methods
 }
 
+Router.prototype.use = function(middleware){
+  this.connect.use(middleware);
+};
 
 Router.prototype.getRoute = function(url){
   var path = urlgrey(url).path();
@@ -94,8 +98,6 @@ Router.prototype.route = function(path, resource){
   // ensure resource was given
   if (!resource) throw new Error('Router#' + path + '() requires a resource');
 
-  // create the route
-  debug('defined %s ', path);
   var route = new Route(path, resource, {
     sensitive: this.caseSensitive,
     strict: this.strict
@@ -162,8 +164,6 @@ var allowHeader = function(router, resource){
 var dispatch = function(router, req, res, next){
   var route;
 
-  debug('dispatching %s %s', req.method, req.url);
-
   req.route = route = router.getRoute(req.url);
   if (!route){
     if (next){
@@ -176,6 +176,7 @@ var dispatch = function(router, req, res, next){
     req.pathVar[pvar] = route.params[pvar];
   }
   var resource = route.resource;
+  req.detourHandler = resource;
   var resourceMethod = req.method.toUpperCase();
   if (!resource[resourceMethod]){
     if (resourceMethod == 'HEAD'){
@@ -186,8 +187,11 @@ var dispatch = function(router, req, res, next){
     }
     return router.eventHandlers[405](req, res, resource);
   }
-  resource[resourceMethod](req, res, next);
-
+  router.use(function(req, res, next){
+    resource[resourceMethod](req, res, next);
+  });
+  //resource[resourceMethod](req, res, next);
+  router.connect(req, res, next);
 };
 
 var parentPath = function(path){

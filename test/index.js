@@ -37,8 +37,8 @@ describe("detour", function(){
 
     beforeEach(function(done){
       v = verity('http://localhost:9999', 'GET');
-      v.expectedBody = 'worked';
-      v.expectedStatus = 200;
+      v.expectBody('worked');
+      v.expectStatus(200);
       done();
     });
 
@@ -110,7 +110,7 @@ describe("detour", function(){
       });
       getServer(router, function(err, serv){
         server = serv;
-        v.method = 'POST';
+        v.method('POST');
         v.test(done);
       });
     });
@@ -135,7 +135,7 @@ describe("detour", function(){
       });
       getServer(router, function(err, server){
         v = verity('http://localhost:9999/test', 'GET');
-        v.expectedBody = 'next works!';
+        v.expectBody('next works!');
         v.test(done);
       });
     });
@@ -151,7 +151,30 @@ describe("detour", function(){
         getServer(router, function(err, serv){
           server = serv;
           v.uri = v.uri.path("test/1234");
-          v.expectedBody = 'worked: {"testid":"1234"}';
+          v.expectBody('worked: {"testid":"1234"}');
+          v.test(done);
+        });
+      });
+    });
+    describe("use", function(){
+      it("accepts connect-style middleware for later processing", function(done){
+        var router = new Router();
+        router.use(function(req, res, next){
+          req.detourHandler.added.should.equal(true);
+          req.whatever = "monkeypatched!";
+          next();
+        });
+        router.route('/test', {
+          added : true,
+          GET : function(req, res){
+            res.end(req.whatever);
+          }
+        });
+        getServer(router, function(err, serv){
+          server = serv;
+          v.method('GET');
+          v.uri = v.uri.path("test");
+          v.expectBody('monkeypatched!');
           v.test(done);
         });
       });
@@ -177,7 +200,29 @@ describe("detour", function(){
           done();
         }
       });
-      it("routes the collection and member objects", function(done){
+      it("routes the collection objects", function(done){
+        var router = new Router();
+        router.collection('/test/:testid', {
+          collection : {
+            GET : function(req, res){
+              res.end('collection here!');
+            }
+          },
+          member : {
+            GET : function(req, res){
+              req.pathVar.testid.should.equal('1234');
+              res.end('member here! ' + JSON.stringify(req.pathVar));
+            }
+          }
+        });
+        getServer(router, function(err, serv){
+          server = serv;
+          v.uri = v.uri.path("test/");
+          v.expectBody('collection here!');
+          v.test(done);
+        });
+      });
+      it("routes the member object", function(done){
         var router = new Router();
         router.collection('/test/:testid', {
           collection : {
@@ -195,15 +240,8 @@ describe("detour", function(){
         getServer(router, function(err, serv){
           server = serv;
           v.uri = v.uri.path("test/1234");
-          v.expectedBody = 'member here! {"testid":"1234"}';
-          v.test(function(err, result){
-            if (err){
-              return done(err);
-            }
-            v.uri = v.uri.parent();
-            v.expectedBody = 'collection here!';
-            v.test(done);
-          });
+          v.expectBody('member here! {"testid":"1234"}');
+          v.test(done);
         });
       });
     });
@@ -214,8 +252,8 @@ describe("detour", function(){
         getServer(router, function(err, serv){
           server = serv;
           v.uri = v.uri.child("doesNotExist");
-          v.expectedStatus = 404;
-          v.expectedBody = 'Not found';
+          v.expectStatus(404);
+          v.expectBody('Not found');
           v.test(function(e, r, b){
             done();
           });
@@ -232,8 +270,8 @@ describe("detour", function(){
         getServer(router, function(err, serv){
           server = serv;
           v.uri = v.uri.child("doesNotExist");
-          v.expectedStatus = 400;
-          v.expectedBody = 'bad request';
+          v.expectStatus(400);
+          v.expectBody('bad request');
           v.test(done);
         });
       });
@@ -257,8 +295,8 @@ describe("detour", function(){
         getServer(router, function(err, serv){
           server = serv;
           v.uri = v.uri.child("doesNotExist");
-          v.expectedStatus = 200;
-          v.expectedBody = 'next works!';
+          v.expectStatus(200);
+          v.expectBody('next works!');
           v.test(done);
         });
       });
@@ -274,10 +312,10 @@ describe("detour", function(){
         });
         getServer(router, function(err, serv){
           server = serv;
-          v.method = "DELETE";
+          v.method("DELETE");
           v.expectHeader('allow', 'GET,HEAD,OPTIONS');
-          v.expectedStatus = 405;
-          v.expectedBody = 'Not allowed';
+          v.expectStatus(405);
+          v.expectBody('Not allowed');
           v.test(function(e, r, b){
             done();
           });
@@ -297,9 +335,9 @@ describe("detour", function(){
         });
         getServer(router, function(err, serv){
           server = serv;
-          v.method = 'DELETE';
-          v.expectedStatus = 400;
-          v.expectedBody = 'bad request';
+          v.method('DELETE');
+          v.expectStatus(400);
+          v.expectBody('bad request');
           v.test(done);
         });
       });
@@ -315,9 +353,9 @@ describe("detour", function(){
         });
         getServer(router, function(err, serv){
           server = serv;
-          v.method = 'HEAD';
-          v.expectedStatus = 200;
-          v.expectedBody = '';
+          v.method('HEAD');
+          v.expectStatus(200);
+          v.expectBody('');
           v.test(done);
         });
       });
@@ -331,9 +369,9 @@ describe("detour", function(){
         });
         getServer(router, function(err, serv){
           server = serv;
-          v.method = 'HEAD';
-          v.expectedStatus = 405;
-          v.expectedBody = '';
+          v.method('HEAD');
+          v.expectStatus(405);
+          v.expectBody('');
           v.test(done);
         });
       });
@@ -347,9 +385,9 @@ describe("detour", function(){
         });
         getServer(router, function(err, serv){
           server = serv;
-          v.method = 'HEAD';
-          v.expectedBody = "";
-          v.expectedStatus = 400;
+          v.method('HEAD');
+          v.expectBody("");
+          v.expectStatus(400);
           v.test(done);
         });
       });
@@ -367,9 +405,9 @@ describe("detour", function(){
         });
         getServer(router, function(err, serv){
           server = serv;
-          v.method = 'HEAD';
-          v.expectedStatus = 400;
-          v.expectedBody = '';
+          v.method('HEAD');
+          v.expectStatus(400);
+          v.expectBody('');
           v.test(done);
         });
       });
@@ -383,9 +421,9 @@ describe("detour", function(){
           }
         });
         getServer(router, function(err, serv){
-          v.method = 'OPTIONS';
+          v.method('OPTIONS');
           v.expectHeader('allow', 'GET,HEAD,OPTIONS');
-          v.expectedBody = "Allow: GET,HEAD,OPTIONS";
+          v.expectBody("Allow: GET,HEAD,OPTIONS");
           server = serv;
           v.test(done);
         });
@@ -399,8 +437,8 @@ describe("detour", function(){
         });
         getServer(router, function(err, serv){
           server = serv;
-          v.method = 'OPTIONS';
-          v.expectedBody = "worked";
+          v.method('OPTIONS');
+          v.expectBody("worked");
           v.test(done);
         });
       });
@@ -412,8 +450,8 @@ describe("detour", function(){
           }
         });
         getServer(router, function(err, serv){
-          v.method = 'OPTIONS';
-          v.expectedBody = "Allow: POST,OPTIONS";
+          v.method('OPTIONS');
+          v.expectBody("Allow: POST,OPTIONS");
           server = serv;
           v.test(done);
         });
@@ -432,9 +470,9 @@ describe("detour", function(){
         });
         getServer(router, function(err, serv){
           server = serv;
-          v.method = 'OPTIONS';
-          v.expectedStatus = 400;
-          v.expectedBody = 'bad request';
+          v.method('OPTIONS');
+          v.expectStatus(400);
+          v.expectBody('bad request');
           v.test(done);
         });
       });
