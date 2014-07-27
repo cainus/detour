@@ -117,6 +117,26 @@ Router.prototype.on = function(event, handler){
   this.eventHandlers[event] = handler;
 };
 
+/*
+  @path - a string specifying a path to use for routing each member of
+  the collection.  The path above this will be used for routing the
+  collection resource itself.
+
+  @pairObject - an object that has `collection` and `member` properties on
+  it, each one being a routable resource object.
+*/
+Router.prototype.collection = function(path, pairObject){
+  if (!pairObject.collection){
+    throw new Error('route.collection() requires an object with a `collection` property.');
+  }
+  if (!pairObject.member){
+    throw new Error('route.collection() requires an object with a `member` property.');
+  }
+  this.route(path, pairObject.member);
+  this.route(parentPath(path), pairObject.collection);
+};
+
+
 Router.prototype.getMethods = function(resource){
   var supportedMethods = [];
   for (var method in resource){
@@ -168,5 +188,15 @@ var dispatch = function(router, req, res, next){
   }
   resource[resourceMethod](req, res, next);
 
+};
+
+var parentPath = function(path){
+  var pieces = path.split('/');
+  var last = pieces.pop();
+  if (!last){
+    // if there was a trailing slash, last will be '', so pop() again
+    last = pieces.pop();
+  }
+  return pieces.join('/');
 };
 

@@ -46,7 +46,10 @@ describe("detour", function(){
       if (server){
         server.close(function(){
           done();
+          server = null;
         });
+      } else {
+        done();
       }
     });
 
@@ -111,31 +114,31 @@ describe("detour", function(){
         v.test(done);
       });
     });
-  it ("in middleware a next callback is passed to a route", function(done){
-    var getServer = function(router, cb){
-      server = http.createServer(function(req, res){
-        router.middleware(req, res, function(err){
-          res.end(err.message);
+    it ("in middleware a next callback is passed to a route", function(done){
+      var getServer = function(router, cb){
+        server = http.createServer(function(req, res){
+          router.middleware(req, res, function(err){
+            res.end(err.message);
+          });
+        }).listen(9999, function(err){
+          if (err) throw err;
+          cb(null, server);
         });
-      }).listen(9999, function(err){
-        if (err) throw err;
-        cb(null, server);
+      };
+      var router = new Router();
+      router.route('/test', {
+        GET: function(req, res, next){
+          next({
+            message: 'next works!'
+          });
+        }
       });
-    };
-    var router = new Router();
-    router.route('/test', {
-      GET: function(req, res, next){
-        next({
-          message: 'next works!'
-        });
-      }
+      getServer(router, function(err, server){
+        v = verity('http://localhost:9999/test', 'GET');
+        v.expectedBody = 'next works!';
+        v.test(done);
+      });
     });
-    getServer(router, function(err, server){
-      v = verity('http://localhost:9999/test', 'GET');
-      v.expectedBody = 'next works!';
-      v.test(done);
-    });
-  });
     describe("pathVar", function(){
       it ("sets pathVar with variables from the url", function(done){
         var router = new Router();
@@ -150,6 +153,57 @@ describe("detour", function(){
           v.uri = v.uri.path("test/1234");
           v.expectedBody = 'worked: {"testid":"1234"}';
           v.test(done);
+        });
+      });
+    });
+    describe("collection", function(){
+      it("errors if it doesn't get a collection object", function(done){
+        var router = new Router();
+        try {
+          router.collection('/test/:testid', {});
+          should.fail("expected exception!");
+        } catch(ex){
+          ex.message.should.equal('route.collection() requires an object with a `collection` property.');
+          done();
+        }
+      });
+      it("errors if it doesn't get a member object", function(done){
+        var router = new Router();
+        try {
+          router.collection('/test/:testid', { collection : {}});
+          should.fail("expected exception!");
+        } catch(ex){
+          ex.message.should.equal('route.collection() requires an object with a `member` property.');
+          done();
+        }
+      });
+      it("routes the collection and member objects", function(done){
+        var router = new Router();
+        router.collection('/test/:testid', {
+          collection : {
+            GET : function(req, res){
+              res.end('collection here!');
+            }
+          },
+          member : {
+            GET : function(req, res){
+              req.pathVar.testid.should.equal('1234');
+              res.end('member here! ' + JSON.stringify(req.pathVar));
+            }
+          }
+        });
+        getServer(router, function(err, serv){
+          server = serv;
+          v.uri = v.uri.path("test/1234");
+          v.expectedBody = 'member here! {"testid":"1234"}';
+          v.test(function(err, result){
+            if (err){
+              return done(err);
+            }
+            v.uri = v.uri.parent();
+            v.expectedBody = 'collection here!';
+            v.test(done);
+          });
         });
       });
     });
