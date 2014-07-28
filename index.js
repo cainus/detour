@@ -187,11 +187,12 @@ var dispatch = function(router, req, res, next){
     }
     return router.eventHandlers[405](req, res, resource);
   }
-  router.use(function(req, res, next){
+  router.connect(req, res, function(err){
+    if (err){
+      return next(err);
+    }
     resource[resourceMethod](req, res, next);
   });
-  //resource[resourceMethod](req, res, next);
-  router.connect(req, res, next);
 };
 
 var parentPath = function(path){
