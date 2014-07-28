@@ -7,7 +7,7 @@ Detour is a router for node.js web applications.
 
 Detour is different from sinatra-style routers (like [express's router](http://expressjs.com/api.html#app.VERB)) because you **route urls to objects** (that have http methods) instead of to http methods.
 
-Rationale:  If you have multiple http methods implemented for a given url (like a lot of APIs do), this style of routing will be much more natural and will vastly improve your code organization and re-use.  With object routing, it's much simpler to keep the related handlers together, but seperated from unrelated handlers (often even in another file/module).
+Rationale:  If you have multiple http methods implemented for a given url (like a lot of APIs do), this style of routing will be much more natural and will vastly improve your code organization and re-use.  With object routing, it's much simpler to keep the related handlers together, but separated from unrelated handlers (often even in another file/module).
 
 It works for node.js' standard HTTP server, as well as [express](http://expressjs.com) and [connect](http://www.senchalabs.org/connect/) applications.
 
