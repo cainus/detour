@@ -129,12 +129,11 @@ Router.prototype.on = function(event, handler){
 */
 Router.prototype.collection = function(path, pairObject){
   if (!pairObject.collection){
-    throw new Error('route.collection() requires an object with a `collection` property.');
+    throw new Error('route.collection() requires an object with a `collection` property.  Path was: ' + path);
   }
-  if (!pairObject.member){
-    throw new Error('route.collection() requires an object with a `member` property.');
+  if (pairObject.member){
+    this.route(path, pairObject.member);
   }
-  this.route(path, pairObject.member);
   this.route(parentPath(path), pairObject.collection);
 };
 

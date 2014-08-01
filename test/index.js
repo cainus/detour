@@ -186,19 +186,14 @@ describe("detour", function(){
           router.collection('/test/:testid', {});
           should.fail("expected exception!");
         } catch(ex){
-          ex.message.should.equal('route.collection() requires an object with a `collection` property.');
+          ex.message.should.equal('route.collection() requires an object with a `collection` property.  Path was: /test/:testid');
           done();
         }
       });
-      it("errors if it doesn't get a member object", function(done){
+      it("does not error if it doesn't get a member object", function(done){
         var router = new Router();
-        try {
-          router.collection('/test/:testid', { collection : {}});
-          should.fail("expected exception!");
-        } catch(ex){
-          ex.message.should.equal('route.collection() requires an object with a `member` property.');
-          done();
-        }
+        router.collection('/test/:testid', { collection : { GET : function(req, res){res.end();}}});
+        done();
       });
       it("routes the collection objects", function(done){
         var router = new Router();
