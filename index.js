@@ -62,7 +62,9 @@ function Router(options) {
         origResEnd.apply(res, ['']);
       };
       */
-      return resource.GET(req, res);
+      // re-distpach as a GET
+      req.method = "GET";
+      return dispatch(self, req, res, function(){});
     },
     'OPTIONS' : function(req, res, resource){
       var header = allowHeader(self, resource);
