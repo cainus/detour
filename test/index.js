@@ -2,11 +2,15 @@ var should = require('should');
 var http = require('http');
 var Router = require('../index');
 var verity = require('verity');
+var request = require('request');
+var assert = require('assert');
+
+var PORT = 9999;
 
 var getServer = function(router, cb){
   var server = http.createServer(function(req, res){
     router.middleware(req, res);
-  }).listen(9999, function(err){
+  }).listen(PORT, function(err){
       if (err) throw err;
       cb(null, server);
     });
@@ -470,6 +474,30 @@ describe("detour", function(){
           v.expectBody('bad request');
           v.test(done);
         });
+      });
+    });
+    describe('failed parameter decoding', function(){
+      it('surfaces the error properly', function(done) {
+        var router = new Router();
+        router.route('/x/:y', {
+          GET: function(){}
+        });
+        var server = http.createServer(function(req, res){
+          router.middleware(req, res, function (err) {
+            res.writeHead(400);
+            res.write(err.message);
+            res.end();
+          });
+        }).listen(PORT, function(err){
+          if (err) throw err;
+          // NOTE - can't use verity here b/c it sanitizes this badly formed URL
+          request('http://localhost:' + PORT + '/x/asdf%', function (err, resp) {
+            assert.equal(resp.statusCode, 400);
+            assert.equal(resp.body, "Failed to decode param 'asdf%'");
+            done();
+          });
+        });
+
       });
     });
   });
