@@ -165,7 +165,13 @@ var allowHeader = function(router, resource){
 var dispatch = function(router, req, res, next){
   var route;
 
-  req.route = route = router.getRoute(req.url);
+  try {
+    req.route = route = router.getRoute(req.url);
+  } catch (err) {
+    next(err);
+    return;
+  }
+
   if (!route){
     if (next){
       return next();
@@ -205,4 +211,3 @@ var parentPath = function(path){
   }
   return pieces.join('/');
 };
-
